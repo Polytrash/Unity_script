@@ -1,24 +1,26 @@
-import os
+ï»¿import os
 import sys
 import maya.cmds as cmds
 import pymel.core as pm
 
-# ƒWƒ‡ƒCƒ“ƒg–¼Ši”[—pƒŠƒXƒg
+# ã‚¸ãƒ§ã‚¤ãƒ³ãƒˆåæ ¼ç´ç”¨ãƒªã‚¹ãƒˆ
 
 childNames = [];
-rootJointName = "";
+jointName = "";
 
-# ‘I‘ğ‚µ‚½ƒWƒ‡ƒCƒ“ƒg‚Ìe‚Ì–¼‚ğæ“¾(ÅŒã‚Ìeq•t‚¯‚ğ–ß‚·ˆ—‚É•K—v‚½‚ß)
+# é¸æŠã—ãŸã‚¸ãƒ§ã‚¤ãƒ³ãƒˆã®è¦ªã®åã‚’å–å¾—(æœ€å¾Œã®è¦ªå­ä»˜ã‘ã‚’æˆ»ã™å‡¦ç†ã«å¿…è¦ãŸã‚)
 jointName = cmds.ls(sl = True)
-rootJointName = cmds.pickWalk(d = "up")
+cmds.parent(world = True)
 cmds.select(clear = True)
 
-# Ä“xƒWƒ‡ƒCƒ“ƒg‚ğ‘I‘ğ
+# å†åº¦ã‚¸ãƒ§ã‚¤ãƒ³ãƒˆã‚’é¸æŠ
 cmds.select(jointName)
-cmds.parent(world = True)
+cmds.makeIdentity(apply = True, t = False, r = True, s =  False, n = False, pn = False, jointOrient = True)
+cmds.select(clear = True)
 
+# å­ã‚¸ãƒ§ã‚¤ãƒ³ãƒˆã®æ•°ã‚’å–å¾—
 
-# qƒWƒ‡ƒCƒ“ƒg‚Ì”‚ğæ“¾
+cmds.select(jointName)
 childCount = cmds.listRelatives( ad=True, type='joint', fullPath=False)
 num = len(childCount)
 
@@ -27,7 +29,8 @@ strJointName = str(jointName)
 splitedJointName = strJointName.split("'")[1]
 jointFinalName = unicode(splitedJointName)
 
-# ƒWƒ‡ƒCƒ“ƒg–¼‚ğchildNamesƒŠƒXƒg‚É’Ç‰Á
+
+# ã‚¸ãƒ§ã‚¤ãƒ³ãƒˆåã‚’childNamesãƒªã‚¹ãƒˆã«è¿½åŠ 
 childNames.append(jointFinalName)
 
 jntOrientValX = cmds.getAttr(jointFinalName + u".jointOrientX")
@@ -41,24 +44,41 @@ print (u"Z : " + unicode(jntOrientValZ))
 
 
 for a in childCount:
+	
 	childJointName = cmds.pickWalk(d = "down")
-
+	cmds.select(childJointName)
 	cmds.parent(world = True)
 	
-	strJointName = str(childJointName)
-	splitedChildJointName = strJointName.split("'")[1]
+	strChildJointName = str(childJointName)
+	splitedChildJointName = strChildJointName.split("'")[1]
 	childJointFinalName = unicode(splitedChildJointName)
 
-	# ƒWƒ‡ƒCƒ“ƒg–¼‚ğchildNamesƒŠƒXƒg‚É’Ç‰Á	
+	# ã‚¸ãƒ§ã‚¤ãƒ³ãƒˆåã‚’childNamesãƒªã‚¹ãƒˆã«è¿½åŠ 	
 	childNames.append(childJointFinalName)
+
+	cmds.setAttr(childJointFinalName + u".jointOrientX", 0)
+	cmds.setAttr(childJointFinalName + u".jointOrientY", 0)
+	cmds.setAttr(childJointFinalName + u".jointOrientZ", 0)
 	
-	cmds.setAttr(childJointFinalName + u".jointOrientX", jntOrientValX)
-	cmds.setAttr(childJointFinalName + u".jointOrientY", jntOrientValY)
-	cmds.setAttr(childJointFinalName + u".jointOrientZ", jntOrientValZ)
+cNum = 0;
+
+for a in childNames:
+	
+	cmds.select(childNames[cNum])
+	cmds.setAttr(childNames[cNum] + u".jointOrientY", -45)
+	cmds.select(clear = True)
+	cNum += 1;
+	
+cmds.setAttr(jointFinalName + u".jointOrientX", 0)
+cmds.setAttr(jointFinalName + u".jointOrientY", 0)
+cmds.setAttr(jointFinalName + u".jointOrientZ", 0)
+	
+cmds.setAttr(jointFinalName + u".rotateX", 0)
+cmds.setAttr(jointFinalName + u".rotateY", -45)
+cmds.setAttr(jointFinalName + u".rotateZ", 0)	
 
 i = -1
 j = -2
-
 for a in childNames:
 	try:
 		cmds.select(childNames[i])
@@ -71,28 +91,8 @@ for a in childNames:
 		pass	
 	
 	cmds.select(clear = True)
+	
 
-cmds.select(childNames[0])
-cmds.select(rootJointName, add = True)
-cmds.Parent(performParent = False)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+print(rootJointName)
+cmds.select(jointName)
+cmds.select(jointName)
