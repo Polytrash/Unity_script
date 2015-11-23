@@ -13,7 +13,7 @@ public class slider : MonoBehaviour {
 		
 	 	myAnimation = GetComponent<Animation>()["Take 001"];
     	myAnimation.speed=0;
-		
+		 
 	}
 	
 	// Update is called once per frame

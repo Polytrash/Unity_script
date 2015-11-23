@@ -14,7 +14,7 @@ public class guiSample : MonoBehaviour
 
 	public float myFloat = 1;
 
-	#endregion
+	#endregion 
 
 	#region strings
 

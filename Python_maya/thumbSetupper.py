@@ -12,7 +12,7 @@ jointName = "";
 jointName = cmds.ls(sl = True)
 cmds.parent(world = True)
 cmds.select(clear = True)
-
+ 
 # 再度ジョイントを選択
 cmds.select(jointName)
 cmds.makeIdentity(apply = True, t = False, r = True, s =  False, n = False, pn = False, jointOrient = True)
