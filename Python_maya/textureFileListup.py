@@ -4,26 +4,49 @@ import maya.cmds as cmds
 i = 0
 j = 0
 k = 0
+tex ={}
 
 geo = pm.ls(sl=True)[0].getShape()
-
+print geo
 sg = geo.outputs(type='shadingEngine')
 print sg
 
-for a in sg:
-	sgInfo = sg[i].connections(type='materialInfo')
-	print 'sg:', sgInfo
-	i += 1
+
+#↑と同じ結果を得る
+
+
+list = cmds.ls( shapes=True )
+print list
+list.remove(u'frontShape')
+list.remove(u'perspShape')
+list.remove(u'sideShape')
+list.remove(u'topShape')
+print list
+
+
+
+
+
+
+sg = list.outputs(type='shadingEngine')
+print sg
+
+
+
+
+for x in shape:
+
+
+	print sg
 	
-for b in sgInfo:
-	fileNode =sgInfo[j].connections(type='file')
-	print 'sgInfo:', sgInfo
-	j += 1
-
-for c in fileNode:
-	textureFile = pm.getAttr(fileNode[k].fileTextureName)
-	print 'textureFile:', str(textureFile)
-	k += 1
-
-result = cmds.distanceDimension( sp=(0, 2, 2), ep=(1, 5, 6) )
-print result
+	for a in sg:
+		sgInfo = sg[i].connections(type='materialInfo')
+		fileNode =sgInfo[0].connections(type='file')
+		for b in fileNode:
+			textureFile = pm.getAttr(fileNode[0].fileTextureName)		
+			tex = str(''.join(textureFile))
+			print tex
+		i += 1
+	
+print b in tex:
+	print tex[0]
