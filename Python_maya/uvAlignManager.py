@@ -19,9 +19,8 @@ class uvAlignManager(object):
 		self.width = 320
 
 		self.uvShell1 = []
-		self.uvShell2 = []
-		self.uvShell3 = []
-	
+		self.uvShell2 = []	
+				
 	def create(self):
 		if cmds.window('uvShellAlignWindow', exists = True):
 			cmds.deleteUI('uvShellAlignWindow')
@@ -47,82 +46,163 @@ class uvAlignManager(object):
 		cmds.setParent("..")	
 		cmds.showWindow()
 		
-	
-	# 選択から UVborder を取得
-
+	# 重複要素の削除メソッド　※list.set((a))では順番が保存されないため
+	def getUniqueNumber(self, lis):
+		r = []
+		for a in lis:
+			if not a in r:
+				r.append(a)
+		return r
+				
+		
 	def getUVboundBox(self, *args):
 		
 		i = 0
-		j = 0
-		
-		objName = []
+		j = 0		
+		k = 0
+		l = 1
+		m = 0
+	
+		objNames = []
 		mapList = []
-		mapNumbers = ""
-		tmpVerts = []
-		tmpVertsUnique = []
+			
+		tmpVtx = []
+		tmpVtxList = []
 
-		tmpList = []	
-		uvShell = []
+		tmpVtxRange = []
+		tmpVtxUnique = []
+
+		mapNumbers = []		
 		
+		uvShell = []				
+		self.uvShell1 = []
+
+		sortedUniqueObjNames = []
+		sortedVtxRange = []
+		sortedVtxUnique = []
+		
+		mapUnique = []
+		mapRange = []
+				
 		cmds.SelectUVBorder;
 		mel.eval('polySelectBorderShell 1')
-		tmpVerts = cmds.ls (sl = 1)
+		tmpVtx = cmds.ls (sl = 1)
 		#print tmpVerts
 
-		# 選択から UVShell を取得して UVborderリストに追加
+		# 選択から UVShell を取得して UVboundingBox リストに追加
 		mel.eval('polySelectBorderShell 0');
-		tmpVerts.extend(cmds.ls(sl = 1))
+		tmpVtx.extend(cmds.ls(sl = 1))
 
 		# 文字列型に変換
-		for tmp in tmpVerts:
-			unicode(tmp)
-			finalTmp = str(tmp)
-			tmpList.append(finalTmp)
+		for vtx in tmpVtx:
+			unicode(vtx)
+			finalVtx = str(vtx)
+			tmpVtxList.append(finalVtx)
+			
+		print tmpVtxList
 	
-		#print tmpList
+		# 取得した map名 から オブジェクト名 部分を取得　
+		for vtx in tmpVtxList:
+			uvName = str(tmpVtxList[i])
+			uvNameSplitted = uvName.split(".")		
+			objNames.append(uvNameSplitted[0])
 
+			i += 1	
+			
 		# リストから重複要素を削除
-		tmpVertsUnique = list(set(tmpList))
+		sortedUniqueObjNames = self.getUniqueNumber(objNames)
+		print "sortedUniqueObjNames:"
+		print sortedUniqueObjNames
+				
+		# 取得したオブジェクト名 sortedUniqueObjNames と tmpVtxList を照合
+		for vtxName in tmpVtxList:
+			vtxNameSplitted = vtxName.split(".")
 
-		# UVShell
-		#print tmpVertsUnique
+			# vtxName と objUniqueNames[j] が合致したら map 部分を tmpVtxRange に格納
+			for vtxElement in sortedUniqueObjNames:
+				if ":" in vtxNameSplitted[1] and vtxElement == vtxNameSplitted[0]:			
+					tmpVtxRange.append(vtxNameSplitted[1])			
 
+			# 合致しなければ 単体のvtxなので、tmpVtxUnique に格納
+				if not ":" in vtxNameSplitted[1] and vtxElement == vtxNameSplitted[0]:	
+					tmpVtxUnique.append(vtxNameSplitted[1])			
 
-		# 選択から UVvertex に変換
-		tmpVerts = cmds.ls (sl = 1)
-		uvs = cmds.polyListComponentConversion (tmpVerts, tuv = True )
-		#print uvs
+			j += 1
+				
+		# リストから重複要素を削除
+		sortedVtxRange = self.getUniqueNumber(tmpVtxRange)
+		print "sortedVtxRange:"
+		print sortedVtxRange
+				
+		# リストから重複要素を削除
+		sortedVtxUnique = self.getUniqueNumber(tmpVtxUnique)
+		print "sortedVtxUnique:"
+		print sortedVtxUnique
+				
+		# tmpVtxRange から 数字部分のみを抽出						
+		mapRange = re.findall("\d+",str(sortedVtxRange))
+		print "mapRange:"
+		print mapRange
+		print "mapRange len:"
+		loop = len(mapRange)/2
+		print loop
 
-		for uv in uvs:
-			uvName = str(uvs[i])
-			uvNameSplitted = uvName.split(".")
-			objName.append(uvNameSplitted[0])
-			mapList.append(uvNameSplitted[1])
-			i += 1
+		# tmpVtxUnique から 数字部分のみを抽出						
+		mapUnique = re.findall("\d+",str(sortedVtxUnique))
+		print "mapUnique:"
+		print mapUnique
+		
+		
+		# tmpVtxRange の範囲の数値を count に取得
+		count = 0
+		w = 0
+		while w < loop: 
+			#print "mapRange[k] is:" 
+			#print mapRange[k]
+			#print "mapRange[l] is:" 
+			#print mapRange[l]
+			for var in range(int(mapRange[k]), int(mapRange[l])):
+				count = var				
+				mapNumbers.append(count)
+				mapNumbers.append(count+1)
+				#print "mapNumbers:"
+				#print mapNumbers
 
-		i = 0
+				k += 2
+				l += 2
+				var += 1
 
-		# re.findall で数字だけを取得
-		mapNumbers = re.findall("\d+",str(mapList))
+			w += 1
 
+		
+		
 		# objName と mapNumbers から uvShell を再定義 
 		for map in mapNumbers:
-			uvShell.append( str(objName[0]) + '.map[' + str(mapNumbers[j]) + ']')
-			j += 1
-	
-			#print uvShell
+			uvShell.append( str(sortedUniqueObjNames[0]) + '.map[' + str(map) + ']')
 		
-		j = 0
+		for map in mapUnique:
+			uvShell.append( str(sortedUniqueObjNames[0]) + '.map[' + str(map) + ']')			
+
+
 	
 		# Shell単位でuvを選択
+
 		for uv in uvShell:
 			cmds.select(uv, add = True)
 			self.uvShell1.append( uv )
-			print self.uvShell1
+		print self.uvShell1
 
 		# boundingBoxの座標を取得
-		#self.boundingBox(uvShell)
-
+		self.boundingBox(uvShell)
+		
+		
+		tmpVtxList = []
+		sortedUniqueObjNames = []
+		sortedVtxRange = []
+		sortedVtxUnique = []
+		mapUnique = []
+		mapNumbers = []
+		mapRange = []
 
 
 #---------------------------------------
