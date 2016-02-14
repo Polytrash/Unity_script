@@ -94,7 +94,8 @@ namespace sgnEffectViewer
 		private bool buttonSave;			// EffectViewr 独自変数[ 11/24]		
 		private bool buttonLoad;			// EffectViewr 独自変数[ 11/24]
 		private bool buttonReset;			// EffectViewr 独自変数[ 11/26]
-		private bool playOrNot = true;				
+		public bool playOrNot = false;		
+		private bool frameBox;
 
 		private GameObject effectActivate = null;
 
@@ -109,7 +110,7 @@ namespace sgnEffectViewer
 
 
 		private float frameTime = 1f/30f;
-		private List<GameObject> stopGoList;
+		private List<string> stopGoList;
 
 		private List<Effect> playList;
 		private List<Effect> removeList;
@@ -124,8 +125,7 @@ namespace sgnEffectViewer
 		private bool isCheckTimeline = true; 					// HGParticleTimeline 独自変数[ 12/3]
 		private bool isLoopOffset = true;	 					// HGParticleTimeline 独自変数[ 12/3]
 
-		private List<int> startFrameList;
-		private List<int> endFrameList;
+		private float zeroFrame = 0;
 
 
 		//private int frameCount = 0;							// HGParticleTimeline 追加変数[ 12/3]
@@ -133,6 +133,7 @@ namespace sgnEffectViewer
 		// Animation Slider用の変数
 		//	private float hSliderValue = 0;		
 		//	private bool sliderClick = false;	
+
 		//	private AnimationState myAnimation;
 
 		// Scriptable Object Generator 関連変数
@@ -191,42 +192,49 @@ namespace sgnEffectViewer
 		///       　Stop  		/// 
 		///////////////////////////
 
-		void StopEffect(Effect e) {
-			
+		void StopEffect(Effect e, int stopGoListNum) {
+
+
+
 			//Transform node = GetNodeWithName (model.transform, e.node);
-			Debug.Log ("StopEffect_RUN");
-			int i = 0;
+			Debug.Log ("StopEffect_Run");
 
+			int loopCount = 0;
+			string goName = "";
+			GameObject go;
 
-			StopGameObjListMake ();
+			foreach (string g in stopGoList) {
+				
+				if (g != null) {
 
-			foreach (GameObject g in stopGoList) {
-
-				if (g == null) {
-
-				} else {
-
-					i += 1;
+					loopCount += 1;
 				}
 			}
-			Debug.Log ("stopGoList has : " + (i) + " GameObjects");
+
+			Debug.Log ("stopGoList has : " + loopCount + " GameObjects");
 
 
-			foreach (GameObject go in stopGoList) {
+				goName = stopGoList [stopGoListNum];
 
 
-				if (go == null) {
-					break;
-				}
+			if (goName != null){
+				
 
-				Debug.Log ("Stop:" + go);
-
+				go = GameObject.Find(goName) ;
 				go.SetActive (false);
 
+				Debug.Log (go + ".SetActive (false)");
 			}
-			currentSlider = 0;
 
+			//currentSlider = 0;
+
+		
 		}
+	
+
+
+
+
 
 		///////////////////////////
 		/// StopGameObjListMake /// 
@@ -235,7 +243,7 @@ namespace sgnEffectViewer
 		void StopGameObjListMake(){
 
 
-			stopGoList = new List<GameObject> ();
+	
 			EffectList action = GetEffectWithName (effectList, effectName);
 
 			int i = 0;
@@ -247,11 +255,11 @@ namespace sgnEffectViewer
 			{		
 				effOriginalName = ReplaceEmpty(eff.effect.ToString(), " (UnityEngine.GameObject)");
 				effRenamed = effOriginalName + "(Clone)";
-				Debug.Log (GameObject.Find (effRenamed));
+				//Debug.Log (GameObject.Find (effRenamed) + " <= exist!");
 
-				GameObject go = GameObject.Find (effRenamed);
 
-				if (go == null) {
+
+				if (eff == null) {
 
 					while (i == 1) {
 
@@ -261,9 +269,7 @@ namespace sgnEffectViewer
 				}
 
 
-
-
-				stopGoList.Add (GameObject.Find (effRenamed));
+				stopGoList.Add (effRenamed);
 
 				//Debug.Log(GameObject.Find (effRenamed));
 
@@ -401,17 +407,17 @@ namespace sgnEffectViewer
 
 
 		//------------------------------------------------------------------------------------------------------------------//
-		// Effectlist[x].Effect.startFrame の 値分 Delayさせたうえで PlayEffect(e) 
+		// Effectlist[x].Effect.startFrame が 0 でない場合、 値分 Delayさせたうえで PlayEffect(e) 
 		//------------------------------------------------------------------------------------------------------------------//
 
-		private IEnumerator StartDelayMethod(float startFrame, float endFrame, Effect e)
+		private IEnumerator StartEffectMethod(float startFrame, float endFrame, Effect e, int stopGoListNum)
 		{
 			actionStartTime = currentTime;
 
 			float updateFrame = startFrame;
 
 			// コルーチンとして--カウント
-			if ((currentTime - actionStartTime) * frameTime < updateFrame * frameTime) {
+			if ((currentTime - actionStartTime) * frameTime < updateFrame * frameTime || (currentTime - actionStartTime) * frameTime == updateFrame * frameTime ) {
 				while (updateFrame  > 0.0f) {
 
 					yield return null;
@@ -422,17 +428,18 @@ namespace sgnEffectViewer
 				removeList.Add (e);
 
 				// EndFrameMethod()
-				StartCoroutine(EndFrameMethod((float)e.startFrame, (float)e.endFrame, e));
+				StartCoroutine(EndFrameMethod((float)e.startFrame, (float)e.endFrame, e, stopGoListNum));
 			}
+
 			playList.Clear ();
 
 		}
 		//------------------------------------------------------------------------------------------------------------------//
 
 		//------------------------------------------------------------------------------------------------------------------//
-		// currentFrame が Effectlist[x].Effect.endFrame の 値に到達したら StopEffect(e) ※StarDelayMethod 内部にセット
+		// currentFrame が Effectlist[x].Effect.endFrame の 値に到達したら StopEffect(e) ※StartEffectMethod 内部にセット
 		//------------------------------------------------------------------------------------------------------------------//
-		private IEnumerator EndFrameMethod(float startFrame, float endFrame, Effect e)
+		private IEnumerator EndFrameMethod(float startFrame, float endFrame, Effect e, int stopGoListNum)
 		{
 
 
@@ -442,15 +449,15 @@ namespace sgnEffectViewer
 			if (startFrame <  endFrame) {
 				while (updateFrame > startFrame)
 				{
-
+					//Debug.Log (updateFrame + " < " + startFrame);
 					updateFrame--;
 					yield return null;
 
 				}
 
-				Debug.Log ("StopEffect_Run");
+				//Debug.Log ("StopEffect_Run");
 
-				StopEffect (e);
+				StopEffect (e, stopGoListNum);
 				playList.Remove (e);
 
 
@@ -463,42 +470,21 @@ namespace sgnEffectViewer
 		// endFrame ジェネリックリストの降順ソート	※ currentMaxDuration の決定用途
 		//------------------------------------------------------------------------------------------------------------------//
 
-		private void EndFrameSort(EffectList action)
+		private void CurrentMaxDurationSort(EffectList action)
 		{
-			foreach(Effect eff in action.effects)
-			{
+			// endFrame の 値から currentMaxDuration => currentSlider の終了地点 を決定する
+
+			int max = 0;
+
+			foreach (Effect eff in action.effects) {
 				
-				endFrameList.Add (eff.endFrame);	// currentMaxDuration を決定する
-			}
-
-			endFrameList.Reverse();
-
-			currentMaxDuration = endFrameList[0];
-
-		}
-		//------------------------------------------------------------------------------------------------------------------//
-
-		//------------------------------------------------------------------------------------------------------------------//
-		// currentSlider用 IEumerator
-		//------------------------------------------------------------------------------------------------------------------//
-
-		private IEnumerator currentSliderUpdator()
-		{
-			float update = 0f;
-			currentSlider = update;
-
-			if (currentSlider >= 0) {
-				while (currentSlider <= currentMaxDuration)
-				{
-					update++;
-					yield return null;
-				}
+				max = Mathf.Max (max, eff.endFrame);
 
 			}
 
+			currentMaxDuration = max;
 		}
 		//------------------------------------------------------------------------------------------------------------------//
-
 
 
 		///////////////////////////////////////////
@@ -527,7 +513,7 @@ namespace sgnEffectViewer
 				////////////////
 				// Model Name //
 				////////////////			
-				effectSequence.Model = model.name;		// string で　保存して Find.GameObjectで取得するか
+				effectSequence.Model = model.name;	// string で　保存して Find.GameObjectで取得するか
 
 				//////////////////
 				// Element Name //
@@ -733,12 +719,11 @@ namespace sgnEffectViewer
 			
 			// Effect 設定
 
-
+			stopGoList = new List<string> ();
 			playList = new List<Effect>();
 			removeList = new List<Effect>();
-			startFrameList = new List<int>();
-			endFrameList = new List<int> ();
-	
+
+
 			charaAnim = model.GetComponent<Animation>();
 			
 			#region Animation Slider定義
@@ -761,35 +746,17 @@ namespace sgnEffectViewer
 
 		// ビューワーの再生 
 		void Update() {
-			
 
 			currentTime += Time.deltaTime;
 
 
-			currentSlider++;
-			/*
-
-			foreach (Effect e in playList) {
-				if (e.startFrame > 0) {
-					PlayEffect (e);
-					removeList.Add (e);
-					
+			if (playOrNot) {
+				if (currentSlider < currentMaxDuration) {
+					currentSlider++;
 				}
-
 			}
 
-			playList.Clear();
 
-			foreach (Effect e in removeList) {
-
-				if (actionEndTime - currentTime > e.endFrame * frameTime) {
-
-					StopEffect(e);
-					removeList.Clear ();
-				}
-
-			}
-			removeList.Clear();
 			/*
 
 
@@ -882,9 +849,16 @@ namespace sgnEffectViewer
 
 			if (buttonPlay) {
 				EffectList action = GetEffectWithName(effectList, effectName);
-					
+
+
 				playOrNot = true;
-				currentSliderUpdator();
+				currentSlider = 0;
+
+				int loopCount = 0;	
+
+				CurrentMaxDurationSort(action);
+
+				stopGoList.Clear ();
 
 				if (effectActivate != null) {	
 				//Skill Activate Effect
@@ -892,38 +866,35 @@ namespace sgnEffectViewer
 					Transform hip = GetNodeWithName(model.transform, "hip");					
 					GameObject.Instantiate(effectActivate, hip.transform.position, Quaternion.identity);
 
-					// ※Instantiate 後に実行しないとNullReference エラー
-
-
 				}
 					
-					charaAnim.AddClip(action.animationClip, action.animationClip.name);	
-					charaAnim.Play(action.animationClip.name);
+				charaAnim.AddClip(action.animationClip, action.animationClip.name);	
+				charaAnim.Play(action.animationClip.name);
 					
-					//Play Effects
-					actionStartTime = currentTime;
-					EndFrameSort(action);
+				//Play Effects
+				actionStartTime = currentTime;
 
-						foreach(Effect e in action.effects)
-						{
-							// startFrameList にstartFrame を順次追加
-							startFrameList.Add(e.startFrame);
+				// stopGOListにEffect名(Clone)(UnityEngine.GameObject)を追加
+				StopGameObjListMake ();
 
-							if (e.startFrame <= 0 || e.startFrame < 0) {
-						
-							PlayEffect(e);
 
-						}else{
 
-							StartCoroutine(StartDelayMethod((float)e.startFrame, (float)e.endFrame, e));
-		
-						}
 
-						//currentSlider = 0;
-						playList.Clear();	
-					playOrNot = false;
 
-					}
+				foreach(Effect e in action.effects)
+				{
+
+					StartCoroutine(StartEffectMethod((float)e.startFrame, (float)e.endFrame, e , loopCount));
+
+					//currentSlider = 0;
+					playList.Clear();	
+					loopCount += 1;
+
+				}
+
+
+
+
 				}
 				#endregion
 				
@@ -939,28 +910,32 @@ namespace sgnEffectViewer
 				if (buttonStop) {
 
 					playOrNot = false;
+					int i = 0;
 
 					EffectList action = GetEffectWithName(effectList, effectName);			
 
 					actionStartTime = currentTime;
 
 					foreach(Effect e in action.effects) {
-					
+
+
 						if (e.startFrame > 0) {
 						
 							if(e.effect != null){
 
-								StopEffect(e);
+								StopEffect(e, i);
 
 							}
 						}
 						else {
 							
-						StopEffect(e);
+						StopEffect(e, i);
 
 						}
 						removeList.Clear();
 						stopGoList.Clear();
+
+					i += 1;
 					}
 				}
 		
@@ -1039,7 +1014,7 @@ namespace sgnEffectViewer
 
 
 				//  ※Animation Slider フレーム数ボックスの定義
-				GUI.Box (new Rect (Screen.width / 1.5f, Screen.height * (1f/1.14f), 200, 40), (currentSlider).ToString ());	
+			   GUI.Box (new Rect (Screen.width / 1.5f, Screen.height * (1f/1.14f), 200, 40), currentSlider.ToString ());	
 
 				GUI.HorizontalScrollbar(new Rect(60, Screen.height * (1f/1.2f), Screen.width * (1f/1.3f), 100), currentSlider, 0.0f, 0.0F, currentMaxDuration);
 
