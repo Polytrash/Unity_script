@@ -168,21 +168,26 @@ namespace sgnEffectViewer
 
 		//　1.エフェクト：プレイ 
 		
-		void PlayEffect(Effect e) {
-			Transform node = GetNodeWithName(model.transform, e.node);
+		void PlayEffect(Effect eff) {
+			Transform node = GetNodeWithName(model.transform, eff.node);
 			
 			GameObject eff_go = 
-				GameObject.Instantiate(e.effect, node.position + e.position, node.rotation * Quaternion.Euler(e.rotation)) as GameObject;
+				GameObject.Instantiate(eff.effect, node.position + eff.position, node.rotation * Quaternion.Euler(eff.rotation)) as GameObject;
 
 
-			if (!e.isGlobal) {
+			if (!eff.isGlobal) {
 				
 				// 親子関係を作る node → eff.transform.parent
 				eff_go.transform.parent = node;		
 				
 			}
 			// 1.スケール設定
-			SetScale(eff_go, e.particleScale, e.scale);	
+			SetScale(eff_go, eff.particleScale, eff.scale);	
+
+			// あくまで初期値の設定なので、継続して値を変え続ける方法が必要
+			SetRandomPos(eff_go, eff.positionRandom);	
+			SetRandomRot(eff_go, eff.rotationRandom);	
+
 			Debug.Log ("Start:" + eff_go);
 			PlayAll (eff_go);
 			
@@ -289,16 +294,57 @@ namespace sgnEffectViewer
 		// 1A.エフェクト：スケール設定用メソッド //
 		//-----------------------------------//
 
-		void SetScale(GameObject eff, float particleScale, Vector3 localScale) {
-			eff.transform.localScale = localScale;
-			var parts = eff.GetComponentsInChildren<ParticleSystem>();	// パーティクルシステム
+		void SetScale(GameObject eff_go, float particleScale, Vector3 localScale) {
+			eff_go.transform.localScale = localScale;
+			var parts = eff_go.GetComponentsInChildren<ParticleSystem>();	// パーティクルシステム
 			foreach (var p in parts) {
 				p.gravityModifier *= particleScale;
 				p.startSize *= particleScale;
 				p.startSpeed *= particleScale;
 			}
 		}
-		
+
+		//-----------------------------------//
+
+		//-----------------------------------//
+		// 1B.エフェクト：ランダム位置設定用メソッド //
+		//-----------------------------------//
+
+		void SetRandomPos(GameObject eff_go, Vector3 posRandom) {
+			eff_go.transform.localPosition = posRandom;
+
+			var parts = eff_go.GetComponentsInChildren<ParticleSystem>();	// パーティクルシステム
+
+			foreach (var p in parts) {
+				p.transform.localPosition = 
+									new Vector3(UnityEngine.Random.Range(0.0f, posRandom.x),
+												UnityEngine.Random.Range(0.0f, posRandom.y),
+												UnityEngine.Random.Range(0.0f, posRandom.z));
+
+				Debug.Log (p.transform.localPosition);
+			}
+		}
+
+		//-----------------------------------//
+
+		//-----------------------------------//
+		// 1C.エフェクト：ランダム回転設定用メソッド //
+		//-----------------------------------//
+
+		void SetRandomRot(GameObject eff_go, Vector3 rotRandom) {
+			eff_go.transform.localPosition = rotRandom;
+			Quaternion rot = transform.localRotation;
+				
+			var parts = eff_go.GetComponentsInChildren<ParticleSystem>();	// パーティクルシステム
+			foreach (var p in parts) {
+				p.transform.localRotation = Quaternion.Euler(UnityEngine.Random.Range(rotRandom.x, 180.0f),
+															UnityEngine.Random.Range(rotRandom.y, 180.0f),
+															UnityEngine.Random.Range(rotRandom.z, 180.0f));
+
+				Debug.Log (p.transform.localRotation);
+			}
+		}
+
 		//-----------------------------------//
 
 		//--------------------------------------------------------------------//
@@ -309,6 +355,7 @@ namespace sgnEffectViewer
 			foreach (EffectList s in actions) {
 				if (s.name.Equals(name)) {
 					return s;
+
 				}
 			}
 
@@ -316,6 +363,8 @@ namespace sgnEffectViewer
 		}
 		
 		//--------------------------------------------------------------------//
+
+
 
 		//----------------------------------------------------------------------------------------//
 		// C1.エフェクト:引数の trans と name から, お互いの名前が合致するかもしくは name が空かの条件で,  //
@@ -410,7 +459,7 @@ namespace sgnEffectViewer
 		// Effectlist[x].Effect.startFrame が 0 でない場合、 値分 Delayさせたうえで PlayEffect(e) 
 		//------------------------------------------------------------------------------------------------------------------//
 
-		private IEnumerator StartEffectMethod(float startFrame, float endFrame, Effect e, int stopGoListNum)
+		private IEnumerator StartEffectMethod(float startFrame, float endFrame, Effect eff, int stopGoListNum)
 		{
 			actionStartTime = currentTime;
 
@@ -424,11 +473,11 @@ namespace sgnEffectViewer
 					updateFrame--;
 				}
 
-				PlayEffect (e);
-				removeList.Add (e);
+				PlayEffect (eff);
+				removeList.Add (eff);
 
 				// EndFrameMethod()
-				StartCoroutine(EndFrameMethod((float)e.startFrame, (float)e.endFrame, e, stopGoListNum));
+				StartCoroutine(EndFrameMethod((float)eff.startFrame, (float)eff.endFrame, eff, stopGoListNum));
 			}
 
 			playList.Clear ();
@@ -439,7 +488,7 @@ namespace sgnEffectViewer
 		//------------------------------------------------------------------------------------------------------------------//
 		// currentFrame が Effectlist[x].Effect.endFrame の 値に到達したら StopEffect(e) ※StartEffectMethod 内部にセット
 		//------------------------------------------------------------------------------------------------------------------//
-		private IEnumerator EndFrameMethod(float startFrame, float endFrame, Effect e, int stopGoListNum)
+		private IEnumerator EndFrameMethod(float startFrame, float endFrame, Effect eff, int stopGoListNum)
 		{
 
 
@@ -457,8 +506,8 @@ namespace sgnEffectViewer
 
 				//Debug.Log ("StopEffect_Run");
 
-				StopEffect (e, stopGoListNum);
-				playList.Remove (e);
+				StopEffect (eff, stopGoListNum);
+				playList.Remove (eff);
 
 
 			}
@@ -869,6 +918,8 @@ namespace sgnEffectViewer
 				}
 					
 				charaAnim.AddClip(action.animationClip, action.animationClip.name);	
+
+
 				charaAnim.Play(action.animationClip.name);
 					
 				//Play Effects
