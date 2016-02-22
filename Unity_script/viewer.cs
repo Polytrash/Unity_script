@@ -59,8 +59,8 @@ namespace sgnEffectViewer
 			public Vector3 rotationRandom;							// rotationRandom追加 [11/20]
 			public Vector3 scale;									// localScale から scale に変更 Vector3.one　から new Vector3 に変更 [11/20]
 			public Vector3 scaleRandom;								// scaleRandom追加 [11/20]
-			public float particleScale = 100f;
-			//public bool na_isLoop;								// isLoop追加 [11/20]
+			public float particleScale;
+			public bool isLoop;										// isLoop追加 [2/19]
 			public int startFrame;
 			public int endFrame;
 			//public bool na_affectPlaySpeed;						// AffectPlaySpeed追加 [11/20]
@@ -69,7 +69,7 @@ namespace sgnEffectViewer
 		};
 
 
-		public EffectList[] effectList;     // 編集中[11/30]
+		public EffectList[] effectList;     
 
 
 		//============================================================================
@@ -80,7 +80,6 @@ namespace sgnEffectViewer
 		public static string EFF_SEQUENCE_NAME = string.Format("Effect_sequence");	
 		public static string EFF_PARAMETER_NAME = string.Format("Effect_parameter");	
 
-
 		private static string text = string.Format("");
 
 
@@ -88,32 +87,29 @@ namespace sgnEffectViewer
 		// 非公開変数定義
 		//============================================================================
 
+		private Vector3 positionRandomTmp;
+		private Vector3 rotationRandomTmp;
+		private Vector3 scaleRandomTmp;
 
 		private bool buttonPlay;			// EffectViewr 独自変数[ 11/26]	
 		private bool buttonStop;			// EffectViewr 独自変数[ 12/2]	
 		private bool buttonSave;			// EffectViewr 独自変数[ 11/24]		
 		private bool buttonLoad;			// EffectViewr 独自変数[ 11/24]
 		private bool buttonReset;			// EffectViewr 独自変数[ 11/26]
-		public bool playOrNot = false;		
-		private bool frameBox;
+		private bool playOrNot = false;		
 
 		private GameObject effectActivate = null;
 
-		private string effectName = "";     	// 編集中[11/30]
+		private string effectName = "";     	
 		private Animation charaAnim;
 		private float currentTime = 0f;			// 現在のタイムを指定
 		private float actionStartTime = 0f;		// スタートフレーム指定
-		//private float actionEndTime = 1000f;    // EffectViewr 独自変数[ 1/7]
-
-		private bool isGlobalStore = false;	  // Scriptable Object格納用変数[11/25]
-		private float particleScaleStore = 1; // Scriptable Object格納用変数[11/25]
-
 
 		private float frameTime = 1f/30f;
 		private List<string> stopGoList;
 
-		private List<Effect> playList;
-		private List<Effect> removeList;
+		// private List<Effect> playList;		// playList廃止[2/19]
+		// private List<Effect> removeList;		// removeList廃止[2/19]
 		private List<GameObject> effectGameObjList;
 
 		// ParticleTimeline 関連変数
@@ -124,16 +120,11 @@ namespace sgnEffectViewer
 		private EditorWindow currentAnimationWindow = null;		// HGParticleTimeline 独自変数[ 12/3]
 		private bool isCheckTimeline = true; 					// HGParticleTimeline 独自変数[ 12/3]
 		private bool isLoopOffset = true;	 					// HGParticleTimeline 独自変数[ 12/3]
-
-		private float zeroFrame = 0;
-
-
 		//private int frameCount = 0;							// HGParticleTimeline 追加変数[ 12/3]
 
 		// Animation Slider用の変数
 		//	private float hSliderValue = 0;		
 		//	private bool sliderClick = false;	
-
 		//	private AnimationState myAnimation;
 
 		// Scriptable Object Generator 関連変数
@@ -173,20 +164,15 @@ namespace sgnEffectViewer
 			
 			GameObject eff_go = 
 				GameObject.Instantiate(eff.effect, node.position + eff.position, node.rotation * Quaternion.Euler(eff.rotation)) as GameObject;
-
-
+			
 			if (!eff.isGlobal) {
 				
 				// 親子関係を作る node → eff.transform.parent
 				eff_go.transform.parent = node;		
-				
+
 			}
 			// 1.スケール設定
 			SetScale(eff_go, eff.particleScale, eff.scale);	
-
-			// あくまで初期値の設定なので、継続して値を変え続ける方法が必要
-			SetRandomPos(eff_go, eff.positionRandom);	
-			SetRandomRot(eff_go, eff.rotationRandom);	
 
 			Debug.Log ("Start:" + eff_go);
 			PlayAll (eff_go);
@@ -198,13 +184,11 @@ namespace sgnEffectViewer
 		///////////////////////////
 
 		void StopEffect(Effect e, int stopGoListNum) {
-
-
-
+			
 			//Transform node = GetNodeWithName (model.transform, e.node);
 			Debug.Log ("StopEffect_Run");
 
-			int loopCount = 0;
+			int i = 0;
 			string goName = "";
 			GameObject go;
 
@@ -212,19 +196,17 @@ namespace sgnEffectViewer
 				
 				if (g != null) {
 
-					loopCount += 1;
+					i += 1;
 				}
 			}
 
-			Debug.Log ("stopGoList has : " + loopCount + " GameObjects");
+			Debug.Log ("stopGoList has : " + i + " GameObjects");
 
 
-				goName = stopGoList [stopGoListNum];
-
+			goName = stopGoList [stopGoListNum];
 
 			if (goName != null){
 				
-
 				go = GameObject.Find(goName) ;
 				go.SetActive (false);
 
@@ -237,32 +219,22 @@ namespace sgnEffectViewer
 		}
 	
 
-
-
-
-
 		///////////////////////////
 		/// StopGameObjListMake /// 
 		///////////////////////////
 
 		void StopGameObjListMake(){
-
-
-	
+				
 			EffectList action = GetEffectWithName (effectList, effectName);
 
 			int i = 0;
 			string effOriginalName = "";
 			string effRenamed = "";
 
-
 			foreach(Effect eff in action.effects)
 			{		
 				effOriginalName = ReplaceEmpty(eff.effect.ToString(), " (UnityEngine.GameObject)");
 				effRenamed = effOriginalName + "(Clone)";
-				//Debug.Log (GameObject.Find (effRenamed) + " <= exist!");
-
-
 
 				if (eff == null) {
 
@@ -273,13 +245,9 @@ namespace sgnEffectViewer
 					}
 				}
 
-
 				stopGoList.Add (effRenamed);
 
-				//Debug.Log(GameObject.Find (effRenamed));
-
 			}
-
 
 		}
 
@@ -297,11 +265,13 @@ namespace sgnEffectViewer
 		void SetScale(GameObject eff_go, float particleScale, Vector3 localScale) {
 			eff_go.transform.localScale = localScale;
 			var parts = eff_go.GetComponentsInChildren<ParticleSystem>();	// パーティクルシステム
+
 			foreach (var p in parts) {
 				p.gravityModifier *= particleScale;
 				p.startSize *= particleScale;
 				p.startSpeed *= particleScale;
 			}
+
 		}
 
 		//-----------------------------------//
@@ -317,9 +287,7 @@ namespace sgnEffectViewer
 
 			foreach (var p in parts) {
 				p.transform.localPosition = 
-									new Vector3(UnityEngine.Random.Range(0.0f, posRandom.x),
-												UnityEngine.Random.Range(0.0f, posRandom.y),
-												UnityEngine.Random.Range(0.0f, posRandom.z));
+					new Vector3(positionRandomTmp.x, positionRandomTmp.y, positionRandomTmp.z);
 
 				Debug.Log (p.transform.localPosition);
 			}
@@ -328,27 +296,66 @@ namespace sgnEffectViewer
 		//-----------------------------------//
 
 		//-----------------------------------//
-		// 1C.エフェクト：ランダム回転設定用メソッド //
+		// 1B.エフェクト：ランダム回転設定メソッド //
 		//-----------------------------------//
 
 		void SetRandomRot(GameObject eff_go, Vector3 rotRandom) {
 			eff_go.transform.localPosition = rotRandom;
-			Quaternion rot = transform.localRotation;
 				
 			var parts = eff_go.GetComponentsInChildren<ParticleSystem>();	// パーティクルシステム
-			foreach (var p in parts) {
-				p.transform.localRotation = Quaternion.Euler(UnityEngine.Random.Range(rotRandom.x, 180.0f),
-															UnityEngine.Random.Range(rotRandom.y, 180.0f),
-															UnityEngine.Random.Range(rotRandom.z, 180.0f));
 
-				Debug.Log (p.transform.localRotation);
+			foreach (var p in parts) {
+				p.transform.localRotation = Quaternion.Euler(rotationRandomTmp.x, rotationRandomTmp.y, rotationRandomTmp.z);
+				p.transform.eulerAngles = new Vector3(rotationRandomTmp.x, rotationRandomTmp.y, rotationRandomTmp.z);
+				Debug.Log (p.transform.eulerAngles);
 			}
 		}
 
 		//-----------------------------------//
 
+		//-----------------------------------//
+		// 1C.ランダム位置取得メソッド //
+		//-----------------------------------//
+
+		void GetRandomPos(Vector3 value) {
+			
+			positionRandomTmp =	new Vector3(UnityEngine.Random.Range(-value.x, value.x),
+											UnityEngine.Random.Range(-value.y, value.y),
+											UnityEngine.Random.Range(-value.z, value.z));
+
+		}
+
+		//-----------------------------------//
+		//-----------------------------------//
+		// 1C.ランダム回転取得メソッド //
+		//-----------------------------------//
+
+		void GetRandomRot(Vector3 value) {
+			
+			rotationRandomTmp =	new Vector3(UnityEngine.Random.Range(-value.x, value.x),
+											UnityEngine.Random.Range(-value.y, value.y),
+											UnityEngine.Random.Range(-value.z, value.z));
+
+		}
+
+		//-----------------------------------//
+
+		//-----------------------------------//
+		// 1C.ランダムスケール取得メソッド //
+		//-----------------------------------//
+
+		void GetRandomScale(Vector3 value) {
+
+			scaleRandomTmp =	new Vector3(UnityEngine.Random.Range(-value.x, value.x),
+											UnityEngine.Random.Range(-value.y, value.y),
+											UnityEngine.Random.Range(-value.z, value.z));
+
+		}
+
+		//-----------------------------------//
+
 		//--------------------------------------------------------------------//
-		// 1B.エフェクト：スキルエフェクト配列から名前の合致するスキルエフェクトを取得 //
+		// 2A.エフェクト：スキルエフェクト配列から名前の合致するスキルエフェクトを取得 //
 		//--------------------------------------------------------------------//
 
 		EffectList GetEffectWithName(EffectList[] actions, string name) {
@@ -363,8 +370,6 @@ namespace sgnEffectViewer
 		}
 		
 		//--------------------------------------------------------------------//
-
-
 
 		//----------------------------------------------------------------------------------------//
 		// C1.エフェクト:引数の trans と name から, お互いの名前が合致するかもしくは name が空かの条件で,  //
@@ -415,9 +420,23 @@ namespace sgnEffectViewer
 		//------------------------------------------------------------------------------------------------------------------//
 
 		void PlayAll(GameObject go) {
+
+
 			foreach (ParticleSystem p in go.GetComponentsInChildren<ParticleSystem>()) {
-				p.Play();
+				
+				p.transform.position = positionRandomTmp;
+				p.transform.rotation = Quaternion.Euler (rotationRandomTmp);
+
+
+				foreach (ParticleEmitter e in p.GetComponentsInChildren<ParticleEmitter>()) {
+
+					e.transform.position = positionRandomTmp;
+					e.transform.rotation = Quaternion.Euler (rotationRandomTmp);
+
+				}
+				p.Play ();
 			}
+
 			foreach (Animation anim in go.GetComponentsInChildren<Animation>()) {
 				anim.Play();
 			}
@@ -441,7 +460,6 @@ namespace sgnEffectViewer
 		//------------------------------------------------------------------------------------------------------------------//
 		// 文字列から特定文字列を削除する //
 		//------------------------------------------------------------------------------------------------------------------//
-
 
 		string ReplaceEmpty(string self, string oldValue)
 		{
@@ -474,13 +492,12 @@ namespace sgnEffectViewer
 				}
 
 				PlayEffect (eff);
-				removeList.Add (eff);
 
 				// EndFrameMethod()
 				StartCoroutine(EndFrameMethod((float)eff.startFrame, (float)eff.endFrame, eff, stopGoListNum));
 			}
 
-			playList.Clear ();
+
 
 		}
 		//------------------------------------------------------------------------------------------------------------------//
@@ -490,28 +507,38 @@ namespace sgnEffectViewer
 		//------------------------------------------------------------------------------------------------------------------//
 		private IEnumerator EndFrameMethod(float startFrame, float endFrame, Effect eff, int stopGoListNum)
 		{
-
-
+			
 			actionStartTime = currentTime;
 			float updateFrame = endFrame;
 
 			if (startFrame <  endFrame) {
+				
+				GetRandomPos(eff.positionRandom);
+				//Debug.Log ("Random Position: " + positionRandomTmp.x + " , " + positionRandomTmp.y + " , " + positionRandomTmp.z);
+				GetRandomRot(eff.rotationRandom);
+				//Debug.Log ("Random Rotaion: " + rotationRandomTmp.x + " , " + rotationRandomTmp.y + " , " + rotationRandomTmp.z);
+				GetRandomScale(eff.scaleRandom);
+				//Debug.Log ("Random Rotaion: " + scaleRandomTmp.x + " , " + scaleRandomTmp.y + " , " + scaleRandomTmp.z);
+							
 				while (updateFrame > startFrame)
 				{
-					//Debug.Log (updateFrame + " < " + startFrame);
+
+					GetRandomPos(eff.positionRandom);
+					//Debug.Log ("Random Position: " + positionRandomTmp.x + " , " + positionRandomTmp.y + " , " + positionRandomTmp.z);
+					GetRandomRot(eff.rotationRandom);
+					//Debug.Log ("Random Rotaion: " + rotationRandomTmp.x + " , " + rotationRandomTmp.y + " , " + rotationRandomTmp.z);
+					GetRandomScale(eff.scaleRandom);
+					//Debug.Log ("Random Rotaion: " + scaleRandomTmp.x + " , " + scaleRandomTmp.y + " , " + scaleRandomTmp.z);
+
 					updateFrame--;
 					yield return null;
 
 				}
 
-				//Debug.Log ("StopEffect_Run");
-
 				StopEffect (eff, stopGoListNum);
-				playList.Remove (eff);
-
 
 			}
-			removeList.Clear ();
+
 		}
 		//------------------------------------------------------------------------------------------------------------------//
 
@@ -556,9 +583,7 @@ namespace sgnEffectViewer
 		void SaveParamToSOBJ(EffectList action , Effect e){
 
 			for (int i = 0; i < action.effects.Length; i++) {
-
-
-
+				
 				////////////////
 				// Model Name //
 				////////////////			
@@ -574,11 +599,6 @@ namespace sgnEffectViewer
 				///////////////////////			
 				// AnimClip 
 				effectSequence.AnimClip = action.animationClip;
-
-				// Effect_paramter SOBJ Name
-				//action.effects[i].effParamName = ReplaceEmpty(effectParameter[i].EffectParamName, " (UnityEngine.GameObject)");
-				// Effect_paramter SOBJ Name
-				//effectParameter[i].EffectParamName = ReplaceEmpty(action.effects[i].effect.ToString(), " (UnityEngine.GameObject)");
 				// Effect 						
 				effectParameter[i].Effect = action.effects[i].effect;
 				// Node		
@@ -598,16 +618,12 @@ namespace sgnEffectViewer
 				// Particle Scale
 				effectParameter[i].ParticleScale = action.effects[i].particleScale;
 
-				//////////////////////////
-				// StartFrame/EndFrame //  
-				/////////////////////////
+				///////////////
+				//   Frame   //  
+				///////////////
+				effectSequence.setIsLoop(i,action.effects[i].isLoop);
 				effectSequence.setStartFrame(i,action.effects[i].startFrame);
 				effectSequence.setEndFrame (i, action.effects [i].endFrame);
-
-				particleScaleStore = e.particleScale; // particleScale の値を セット用 particleScaleStore にセット
-				isGlobalStore = e.isGlobal;	// IsGlobal の値を セット用 isGlobalStore にセット
-
-
 
 			}
 
@@ -645,9 +661,6 @@ namespace sgnEffectViewer
 				///////////////////////			
 				// AnimClip 
 				action.animationClip = effectSequence.AnimClip;
-
-				// Effect_paramter SOBJ Name
-				//action.effects[i].effParamName = ReplaceEmpty(effectParameter[i].EffectParamName, " (UnityEngine.GameObject)");
 				// Effect 						
 				action.effects[i].effect = effectParameter[i].Effect;
 				// Node		
@@ -666,15 +679,15 @@ namespace sgnEffectViewer
 				action.effects[i].scaleRandom = effectParameter[i].ScaleRandom;
 				// Particle Scale
 				action.effects[i].particleScale = effectParameter[i].ParticleScale;
-				
+
 				///////////////
-				// StartFrame// // 要対応 12/17
+				//   Frame   //  
 				///////////////
+				action.effects[i].isLoop = effectSequence.getIsLoop(i);
 				action.effects[i].startFrame = effectSequence.getStartFrame(i);
 				action.effects[i].endFrame = effectSequence.getEndFrame (i);
 
-				isGlobalStore = e.isGlobal;	// IsGlobal の値を セット用 isGlobalStore にセット
-				particleScaleStore = e.particleScale; // particleScale の値を セット用 particleScaleStore にセット
+
 			}
 
 		}
@@ -769,10 +782,6 @@ namespace sgnEffectViewer
 			// Effect 設定
 
 			stopGoList = new List<string> ();
-			playList = new List<Effect>();
-			removeList = new List<Effect>();
-
-
 			charaAnim = model.GetComponent<Animation>();
 			
 			#region Animation Slider定義
@@ -798,49 +807,11 @@ namespace sgnEffectViewer
 
 			currentTime += Time.deltaTime;
 
-
 			if (playOrNot) {
 				if (currentSlider < currentMaxDuration) {
 					currentSlider++;
 				}
 			}
-
-
-			/*
-
-
-			for(int i = 0; i < playList.ToArray().Length; i++)
-			{
-
-				// 現在のフレーム(デルタタイム)からアクションスタートタイムを引いた値がエフェクト0フレームより大きければ
-				if (currentTime - actionStartTime > playList[i].startFrame * frameTime) { 
-
-					PlayEffect(playList[i]);
-					removeList.Add(playList[i]); 
-					Debug.Log("currentTime" + (currentTime - actionStartTime).ToString());
-				}
-
-				playList.Clear();
-
-
-				if (playList.Count > 0) {
-					
-
-
-				if(actionEndTime - currentTime > removeList[i].endFrame * frameTime)
-				{
-
-					for(int j = 0;  j < removeList.ToArray().Length; j++){
-						//StopEffect(removeList[j]);
-
-						removeList.Clear();
-						Debug.Log("currentTime" + (currentTime - actionStartTime).ToString());
-					}
-
-				}
-
-				}
-			}*/
 
 		}
 
@@ -869,11 +840,11 @@ namespace sgnEffectViewer
 		// 非公開関数定義
 		//============================================================================
 			
-			///////////////////////////
-			/// 					/// 
-			///       OnGUI 		/// 
-			///						/// 
-			///////////////////////////
+		///////////////////////////
+		/// 					/// 
+		///       OnGUI 		/// 
+		///						/// 
+		///////////////////////////
 			
 			// プレイモードでのビューワー上に表示されるGUIの定義
 			
@@ -888,75 +859,71 @@ namespace sgnEffectViewer
 
 
 
-			///////////////////////////
-			///  Button to Play		/// 
-			///////////////////////////
-			#region buttonPlay定義
-			buttonPlay = GUI.Button(new Rect(Screen.width / 1.5f, Screen.height * (1f/1.08f), 100, 50), "➤");
+		///////////////////////////
+		///  Button to Play		/// 
+		///////////////////////////
+		#region buttonPlay定義
+
+			buttonPlay = GUI.Button(new Rect(Screen.width / 1.5f, Screen.height * (1f/1.1f), 75, 50), "➤");
 				
 
 
 			if (buttonPlay) {
 				EffectList action = GetEffectWithName(effectList, effectName);
 
+				// 現時点のパラメータを ScriptableObject に保存 
 
-				playOrNot = true;
+				int i = 0;
+				int j = 0;
+					
+				foreach(Effect e in action.effects) 
+				{
+					SaveParamToSOBJ (action,  action.effects[i]);
+					i += 1;
+				}					
+
 				currentSlider = 0;
+				playOrNot = true;
 
-				int loopCount = 0;	
 
 				CurrentMaxDurationSort(action);
-
 				stopGoList.Clear ();
 
+				//Skill Activate Effect	
 				if (effectActivate != null) {	
-				//Skill Activate Effect
-		
+	
 					Transform hip = GetNodeWithName(model.transform, "hip");					
 					GameObject.Instantiate(effectActivate, hip.transform.position, Quaternion.identity);
 
 				}
-					
+
+				// Play Character Animation
+
 				charaAnim.AddClip(action.animationClip, action.animationClip.name);	
-
-
 				charaAnim.Play(action.animationClip.name);
-					
-				//Play Effects
+
 				actionStartTime = currentTime;
 
-				// stopGOListにEffect名(Clone)(UnityEngine.GameObject)を追加
+				// stopGOList に Effect名(Clone)(UnityEngine.GameObject)を追加
 				StopGameObjListMake ();
 
-
-
-
-
+				// Play Effects
 				foreach(Effect e in action.effects)
 				{
-
-					StartCoroutine(StartEffectMethod((float)e.startFrame, (float)e.endFrame, e , loopCount));
-
-					//currentSlider = 0;
-					playList.Clear();	
-					loopCount += 1;
+					StartCoroutine(StartEffectMethod((float)e.startFrame, (float)e.endFrame, e , j));
+					j += 1;
+				}
 
 				}
 
-
-
-
-				}
-				#endregion
+			#endregion
 				
-				///////////////////////////
-				///  Button to Stop		/// 
-				///////////////////////////
-				#region buttonStop定義
+			///////////////////////////
+			///  Button to Stop		/// 
+			///////////////////////////
+			#region buttonStop定義
 				
-
-
-				buttonStop = GUI.Button(new Rect(Screen.width / 1.22f, Screen.height * (1f/1.08f), 100, 50), "■");
+				buttonStop = GUI.Button(new Rect(Screen.width / 1.27f, Screen.height * (1f/1.1f), 75, 50), "■");
 				
 				if (buttonStop) {
 
@@ -968,8 +935,7 @@ namespace sgnEffectViewer
 					actionStartTime = currentTime;
 
 					foreach(Effect e in action.effects) {
-
-
+					
 						if (e.startFrame > 0) {
 						
 							if(e.effect != null){
@@ -983,42 +949,23 @@ namespace sgnEffectViewer
 						StopEffect(e, i);
 
 						}
-						removeList.Clear();
+
 						stopGoList.Clear();
 
 					i += 1;
 					}
 				}
 		
+			#endregion
 
-
-				#endregion
-
-				///////////////////////////
-				///  Button to Save		/// 
-				///////////////////////////
-	
-				buttonSave = GUI.Button(new Rect(10,40,100,50), "Save");
-				
-				if (buttonSave) {
-					EffectList action = GetEffectWithName (effectList, effectName);
-
-					for (int i = 0; i < action.effects.Length; i++)
-					{
-
-						SaveParamToSOBJ (action,  action.effects[i]);
-							
-					}					
-	
-				}
 
 				
-				///////////////////////////
-				///  Button to Load		/// 
-				///////////////////////////
+			///////////////////////////
+			///  Button to Load		/// 
+			///////////////////////////
 
 				
-				buttonLoad = GUI.Button(new Rect(120,40,100,50), "Load");
+			buttonLoad = GUI.Button(new Rect(10,40,100,50), "Load");
 				
 				if (buttonLoad) {
 
@@ -1036,11 +983,11 @@ namespace sgnEffectViewer
 				
 				// Scriptable Object からパラメータを読み込み
 				
-				///////////////////////////
-				///   Button to Reset	/// 
-				///////////////////////////
+			///////////////////////////
+			///   Button to Reset	/// 
+			///////////////////////////
 				
-				buttonReset = GUI.Button (new Rect (300, 30, 120, 50), "Reset");
+				buttonReset = GUI.Button (new Rect (120, 40, 100, 50), "Reset");
 				
 				if (buttonReset) {
 					
@@ -1058,14 +1005,13 @@ namespace sgnEffectViewer
 						action.effects [i].particleScale = 1;
 						action.effects [i].startFrame = 0;
 						action.effects [i].endFrame = 100;
-
-						
+											
 					}
 				}
 
 
 				//  ※Animation Slider フレーム数ボックスの定義
-			   GUI.Box (new Rect (Screen.width / 1.5f, Screen.height * (1f/1.14f), 200, 40), currentSlider.ToString ());	
+			    GUI.Box (new Rect (Screen.width / 1.27f, Screen.height * (1f/1.16f), 60, 30), currentSlider.ToString ());	
 
 				GUI.HorizontalScrollbar(new Rect(60, Screen.height * (1f/1.2f), Screen.width * (1f/1.3f), 100), currentSlider, 0.0f, 0.0F, currentMaxDuration);
 
@@ -1087,7 +1033,7 @@ namespace sgnEffectViewer
 				text = GUI.TextField (new Rect(Screen.width * (1f/1.425f), Screen.height * (1f/80f), 200, 20), text, 40);
 
 
-				buttonESN = GUI.Button (new Rect(Screen.width * (1f/1.425f), Screen.height * (1f/25f),  200, 20), "Sequence Data Generate ");
+				buttonESN = GUI.Button (new Rect(Screen.width * (1f/1.425f), Screen.height * (1f/25f),  200, 30), "Sequence Data Generate ");
 
 				if (buttonESN) {
 
@@ -1095,7 +1041,7 @@ namespace sgnEffectViewer
 
 				}
 
-				buttonEPN = GUI.Button (new Rect(Screen.width * (1f/1.425f), Screen.height * (1f/16f),200, 20), "Parameter Data Generate");
+				buttonEPN = GUI.Button (new Rect(Screen.width * (1f/1.425f), Screen.height * (1f/12f),200, 30), "Parameter Data Generate");
 
 				if (buttonEPN) {
 
