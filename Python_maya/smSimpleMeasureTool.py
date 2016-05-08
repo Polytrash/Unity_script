@@ -1,18 +1,24 @@
+# -*- coding: utf-8 -*-
+#最終更新:2016/1/5
+
+# import maya
+import sys
+import traceback
+import shutil
+import glob
+import os
 import pymel.core as pm
 import maya.cmds as cmds
-import math
 
-class simpleMeasureTool(object):
-#selection = cmds.ls(sl=True)
-#objPos = cmds.getAttr(".translateX") 
-#print objPos
+class smSimpleMeasureTool(object):
+
 	def __init__(self):
 		self.window = 'simpleMeasureToolWindow';
-		self.title = 'Simple Measure Tool Window';
+		self.title = 'Simple Measure Tool';
 		
-		self.size = (360, 420);
-		self.width = 360;
-		self.height = 420;
+		self.size = (320, 380);
+		self.width = 320;
+		self.height = 380;
 		
 		self.buttonApressed = False	
 		self.buttonBpressed = False	
@@ -33,30 +39,36 @@ class simpleMeasureTool(object):
 			cmds.deleteUI('simpleMeasureToolWindow')
 
 		self.window = cmds.window(self.window, title = self.title, widthHeight = self.size)
-		self.frameForm = cmds.frameLayout(label = " A - B　間の距離を計測します ", bgc = (0.3, 0.4, 0.1), cll = True)
-		self.distDcheckBox = cmds.checkBox('chckD', label = "計測位置にメジャーツールを作成します", edit = False, value = False, onCommand = self.setGendistDT)
+		self.frameForm = cmds.frameLayout(label = u" A -> Bの距離間を計測します", bgc = (0.15, 0.15, 0.15), cll = True)
 
-		
+		self.projNametext = cmds.text(u"■ A地点、B地点 にはそれぞれオブジェクトか頂点を指定できます", font = u"smallBoldLabelFont", align = 'left');					
 		cmds.columnLayout()
 		cmds.setParent("..")	
 		cmds.rowColumnLayout()	
 		cmds.setParent("..")	
-		self.frameForm = cmds.frameLayout(label = " A地点", bgc = (0.2, 0.3, 0.2), cll = False)		
-		self.posFieldA = cmds.floatFieldGrp('posFA', numberOfFields=3, label = u'A点', pre = 3, adj = True)
-		self.setButtonA = cmds.button(label = "セットA" , command = self.setPositionA, height = 30 )
-		self.frameForm = cmds.frameLayout(label = " B地点", bgc = (0.2, 0.3, 0.2), cll = False)		
-		self.posFieldB = cmds.floatFieldGrp('posFB', numberOfFields=3, label = u'B点', pre = 3, adj = True)
-		self.setButtonB = cmds.button(label = "セットB" , command = self.setPositionB, height = 30 )
+		
+		self.frameForm = cmds.frameLayout(label = u" 1. A地点に選択してセット", bgc = (0.5, 0.2, 0.2), cll = False)	
+		self.setButtonA = cmds.button(label = u"セットA" , command = self.setPositionA, height = 30 )			
+		self.posFieldA = cmds.floatFieldGrp('posFA', numberOfFields=3, label = u"A点", pre = 3, adj = True)
+
+		self.frameForm = cmds.frameLayout(label = u" 2. B地点を選択してセット", bgc = (0.2, 0.3, 0.5), cll = False)		
+
+		self.setButtonB = cmds.button(label = u"セットB" , command = self.setPositionB, height = 30 )		
+		self.posFieldB = cmds.floatFieldGrp('posFB', numberOfFields=3, label = u"B点", pre = 3, adj = True)
 				
 
 		
+
+		self.frameForm = cmds.frameLayout(label = u" 3. A -> B の距離を計測", bgc = (0.2, 0.5, 0.2), cll = False)		
+		self.distDcheckBox = cmds.checkBox('chckD', label = u"計測と同時にMayaデフォルトのメジャーツールも作成", edit = False, value = False, onCommand = self.setGendistDT)
+		self.executeButton = cmds.button(label = u" A -> B 計測" , command = self.measurementPosition, height = 30 )	
 		cmds.separator(width = self.width, style = 'in')
-		self.distField = cmds.floatFieldGrp('distF',numberOfFields=1, label = u'A - B 間の距離',extraLabel='cm', pre = 3, adj = True)		
-		self.executeButton = cmds.button(label = "計測" , command = self.measurementPosition, height = 30 )
 
-		
-		cmds.text("【問い合わせ先】", bgc = (0.2, 0.2, 0.2), align = 'left')	
+		self.distField = cmds.floatFieldGrp('distF',numberOfFields=1, label = u"A -> B 間の距離",extraLabel='cm', pre = 3, adj = True)		
+	
 
+		cmds.setParent("..")
+		cmds.text(u"【問い合わせ先】 : TAセクション.村岡", bgc = (0.2, 0.2, 0.2), align = 'left', width = self.width);
 		cmds.setParent("..")	
 		cmds.showWindow()
 
@@ -134,7 +146,7 @@ class simpleMeasureTool(object):
 				
 				
 	def selectCheckerA(self, selection):
-		if cmds.objectType(selection) == u'mesh':
+		if cmds.objectType(selection) == 'mesh':
 			print "this is mesh"
 			self.meshCheckA = False
 		else:
@@ -144,7 +156,7 @@ class simpleMeasureTool(object):
 	
 	
 	def selectCheckerB(self, selection):
-		if cmds.objectType(selection) == u'mesh':
+		if cmds.objectType(selection) == 'mesh':
 			print "this is mesh"
 			self.meshCheckB = False
 		else:
@@ -174,9 +186,9 @@ class simpleMeasureTool(object):
 	def getObjPos(self, selection):
 		pos = []
 		print "getObjPos"
-		pos.append(cmds.getAttr(selection + u'.translateX'))
-		pos.append(cmds.getAttr(selection + u'.translateY'))
-		pos.append(cmds.getAttr(selection + u'.translateZ'))
+		pos.append(cmds.getAttr(selection + '.translateX'))
+		pos.append(cmds.getAttr(selection + '.translateY'))
+		pos.append(cmds.getAttr(selection + '.translateZ'))
 		print pos		
 		if 	self.buttonApressed == True	:
 			self.setPosFA(pos)
@@ -197,7 +209,7 @@ class simpleMeasureTool(object):
 			self.generateDistanceDimension(self.posA, self.posB)
 			self.genDistD == False
 		
-simpleMesurToolWindow = simpleMeasureTool()
+simpleMesurToolWindow = smSimpleMeasureTool()
 simpleMesurToolWindow.create()
 
 
