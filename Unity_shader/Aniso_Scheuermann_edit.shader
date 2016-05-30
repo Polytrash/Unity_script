@@ -1,144 +1,71 @@
-﻿Shader "Advanced Hair Shader Pack/Aniso Scheuermann" 
+﻿Shader "Advanced Hair Shader Pack/mobile/Aniso Scheuermann Mobile_edit" 
 {
 	Properties 
 	{
 		_MainTex ("Diffuse (RGB) Alpha (A)", 2D) = "white" {}
 		_Color ("Main Color", Color) = (1,1,1,1)
+		_NormalTex ("Normal Map", 2D) = "white" {}
 		_SpecularTex ("Specular (R) Spec Shift (G) Spec Mask (B)", 2D) = "gray" {}
 		_SpecularMultiplier ("Specular Multiplier", float) = 1.0
 		_SpecularColor ("Specular Color", Color) = (1,1,1,1)
-		_SpecularMultiplier2 ("Secondary Specular Multiplier", float) = 1.0
-		_SpecularColor2 ("Secondary Specular Color", Color) = (1,1,1,1)
 		_Cutoff ("Alpha Cut-Off Threshold", float) = 0.95
 		_PrimaryShift ( "Specular Primary Shift", float) = .5
-		_SecondaryShift ( "Specular Secondary Shift", float) = .7
+
 	}
 	
 	SubShader
-	{	
+	{
 		Tags {"Queue"="Geometry" "IgnoreProjector"="True" "RenderType"="TransparentCutout"}
-				
+		
+		AlphaTest Greater [_Cutoff]
 		Blend Off
 		Cull Back
 		ZWrite on
 		
 		CGPROGRAM
-		#pragma surface surf Hair vertex:vert
-		#pragma target 3.0
-			
-			struct SurfaceOutputHair 
-			{
-				fixed3 Albedo;
-				fixed3 Normal;
-				fixed3 Emission;
-				half Specular;
-				fixed SpecShift;
-				fixed Alpha;
-				fixed SpecMask;
-				
-				half3 tangent_input; 
-			};
+		#pragma surface surf Lambert alphatest:_Cutoff approxview noforwardadd halfasview exclude_path:prepass  
 					
 			struct Input
 			{
-				float2 uv_MainTex;
-				half3 tangent_input;
+				fixed2 uv_MainTex;
 			};
-			
-			void vert(inout appdata_full i, out Input o)
-			{	
-				UNITY_INITIALIZE_OUTPUT(Input, o);	
-				o.tangent_input = i.tangent.xyz;
-			}
 
-			sampler2D _MainTex, _SpecularTex;
-			float _SpecularMultiplier, _SpecularMultiplier2, _PrimaryShift, _SecondaryShift, _Cutoff;
-			fixed4 _SpecularColor, _Color, _SpecularColor2;
+			sampler2D _MainTex;
+			fixed4 _Color;
 			
-			void surf (Input IN, inout SurfaceOutputHair o)
+			void surf (Input IN, inout SurfaceOutput o)
 			{
 				fixed4 albedo = tex2D(_MainTex, IN.uv_MainTex);
 				o.Albedo = lerp(albedo.rgb,albedo.rgb*_Color.rgb,0.5);
 				o.Alpha = albedo.a;
-				clip ( o.Alpha - _Cutoff  );
-				fixed3 spec = tex2D(_SpecularTex, IN.uv_MainTex).rgb;
-				o.Specular = spec.r;
-				o.SpecShift = spec.g;
-				o.SpecMask = spec.b;		
-				o.tangent_input = IN.tangent_input ;
-			}
-			
-			half3 ShiftTangent ( half3 T, half3 N, float shift)
-			{
-				half3 shiftedT = T+ shift * N;
-				return normalize( shiftedT);
-			}
-			
-			float StrandSpecular ( half3 T, half3 V, half3 L, float exponent)
-			{
-				half3 H = normalize ( L + V );
-				float dotTH = dot ( T, H );
-				float sinTH = sqrt ( 1 - dotTH * dotTH);
-				float dirAtten = smoothstep( -1, 0, dotTH );
-				return dirAtten * pow(sinTH, exponent);
-			}
-
-			inline fixed4 LightingHair (SurfaceOutputHair s, fixed3 lightDir, fixed3 viewDir, fixed atten)
-			{
-				float NdotL = saturate(dot(s.Normal, lightDir));
-			
-				float shiftTex = s.SpecShift - .5;
-				half3 T = -normalize(cross( s.Normal, s.tangent_input));
-				
-				half3 t1 = ShiftTangent ( T, s.Normal, _PrimaryShift + shiftTex );
-				half3 t2 = ShiftTangent ( T, s.Normal, _SecondaryShift + shiftTex );
-				
-				half3 diff = saturate ( lerp ( .25, 1, NdotL));
-				diff = diff * _Color ;
-				
-				half3 spec =  _SpecularColor * StrandSpecular(t1, viewDir, lightDir, _SpecularMultiplier);
-				
-				spec = spec +  _SpecularColor2 * s.SpecMask * StrandSpecular ( t2, viewDir, lightDir, _SpecularMultiplier2) ;
-
-				// Reflection part
-				float3 coords = normalize(s.Emission);
-				float4 ReflectProbeColor = 1.0;
-				float4 val = UNITY_SAMPLE_TEXCUBE(unity_SpecCube0, coords);
-				ReflectProbeColor.xyz = DecodeHDR(val, unity_SpecCube0_HDR);
-				ReflectProbeColor.w = 1.0;
-
-				fixed4 c;
-				c.rgb = (diff + spec + ReflectProbeColor.xyz ) * s.Albedo * atten * 2 * _LightColor0.rgb * NdotL;
-				c.a = s.Alpha; 
-				return c;
 			}
 		ENDCG
-				
-		Blend SrcAlpha OneMinusSrcAlpha
+		
+		AlphaTest LEqual [_Cutoff]
 		Cull Back
 		ZWrite off
 		
 		CGPROGRAM
-		#pragma surface surf Hair vertex:vert
-		#pragma target 3.0
+		#pragma surface surf Aniso vertex:vert alpha approxview halfasview noforwardadd exclude_path:prepass 
 			
-			struct SurfaceOutputHair 
+			struct SurfaceOutputAniso 
 			{
-				fixed3 Albedo;
-				fixed3 Normal;
-				fixed3 Emission;
-				half Specular;
-				fixed SpecShift;
-				fixed Alpha;
-				fixed SpecMask;
+			    fixed3 Albedo;
+			    fixed3 Normal;
+			    fixed3 Emission;
+			    fixed Specular;
+			    fixed Gloss;
+			    fixed Alpha;
 				
-				half3 tangent_input; 
+				fixed SpecShift;
+				fixed SpecMask;
+				fixed3 tangent_input; 
 			};
 					
 			struct Input
 			{
-				float2 uv_MainTex;
-				half3 tangent_input;
+				fixed2 uv_MainTex;
+				fixed3 tangent_input;
 			};
 			
 			void vert(inout appdata_full i, out Input o)
@@ -147,68 +74,54 @@
 				o.tangent_input = i.tangent.xyz;
 			}
 
-			sampler2D _MainTex, _SpecularTex;
-			float _SpecularMultiplier, _SpecularMultiplier2, _PrimaryShift, _SecondaryShift, _Cutoff;
-			fixed4 _SpecularColor, _Color, _SpecularColor2;
+			sampler2D _MainTex, _SpecularTex, _NormalTex;
+			fixed _SpecularMultiplier, _PrimaryShift;
+			fixed4 _SpecularColor, _Color;
 			
-			void surf (Input IN, inout SurfaceOutputHair o)
+			void surf (Input IN, inout SurfaceOutputAniso o)
 			{
 				fixed4 albedo = tex2D(_MainTex, IN.uv_MainTex);
 				o.Albedo = lerp(albedo.rgb,albedo.rgb*_Color.rgb,0.5);
 				o.Alpha = albedo.a;
-				clip ( _Cutoff  - o.Alpha );
+				
 				fixed3 spec = tex2D(_SpecularTex, IN.uv_MainTex).rgb;
-				o.Specular = spec.r;
+				o.Specular = spec.b;	
 				o.SpecShift = spec.g;
-				o.SpecMask = spec.b;		
+				o.SpecMask = spec.b;	
 				o.tangent_input = IN.tangent_input ;
+				o.Normal = UnpackNormal(tex2D(_NormalTex, IN.uv_MainTex));
 			}
 			
-			half3 ShiftTangent ( half3 T, half3 N, float shift)
+			fixed StrandSpecular ( fixed3 T, fixed3 V, fixed3 L, fixed exponent)
 			{
-				half3 shiftedT = T+ shift * N;
-				return normalize( shiftedT);
-			}
-			
-			float StrandSpecular ( half3 T, half3 V, half3 L, float exponent)
-			{
-				half3 H = normalize ( L + V );
-				float dotTH = dot ( T, H );
-				float sinTH = sqrt ( 1 - dotTH * dotTH);
-				float dirAtten = smoothstep( -1, 0, dotTH );
+				fixed3 H = normalize ( L + V );
+				fixed dotTH = dot ( T, H );
+				fixed sinTH = sqrt ( 1 - dotTH * dotTH);
+				fixed dirAtten = smoothstep( -1, 0, dotTH  );
 				return dirAtten * pow(sinTH, exponent);
 			}
-
-			inline fixed4 LightingHair (SurfaceOutputHair s, fixed3 lightDir, fixed3 viewDir, fixed atten)
-			{
-				float NdotL = saturate(dot(s.Normal, lightDir));
 			
-				float shiftTex = s.SpecShift - .5;
-				half3 T = -normalize(cross( s.Normal, s.tangent_input));
-				
-				half3 t1 = ShiftTangent ( T, s.Normal, _PrimaryShift + shiftTex );
-				half3 t2 = ShiftTangent ( T, s.Normal, _SecondaryShift + shiftTex );
-				
-				half3 diff = saturate ( lerp ( .25, 1, NdotL));
-				diff = diff * _Color ;
-				
-				half3 spec = _SpecularColor * StrandSpecular(t1, viewDir, lightDir, _SpecularMultiplier);
-				
-				spec = spec +  _SpecularColor2 * s.SpecMask * StrandSpecular ( t2, viewDir, lightDir, _SpecularMultiplier2);
+			fixed3 ShiftTangent ( fixed3 T, fixed3 N, fixed shift)
+			{
+				return normalize( T + shift * N);
+			}
 
-				// Reflection part
-				float3 coords = normalize(s.Emission);
-				float4 ReflectProbeColor = 1.0;
-				float4 val = UNITY_SAMPLE_TEXCUBE(unity_SpecCube0, coords);
-				ReflectProbeColor.xyz = DecodeHDR(val, unity_SpecCube0_HDR);
-				ReflectProbeColor.w = 1.0;
-
+			inline fixed4 LightingAniso (SurfaceOutputAniso s, fixed3 lightDir, fixed3 viewDir, fixed atten)
+			{		
+		
+				fixed NdotL = saturate(dot(s.Normal, lightDir));
+				fixed3 T = -(cross( s.Normal, s.tangent_input));
+			
+				fixed shiftTex = s.SpecShift - 0.5;
+				fixed3 t1 = ShiftTangent ( T, s.Normal, _PrimaryShift + shiftTex );
+				fixed3 spec = _SpecularColor * s.SpecMask * StrandSpecular(t1, viewDir, lightDir, _SpecularMultiplier) / _LightColor0.rgb  ;	// EDIT! / _LightColor0.rgb追加 * スペキュラー強度の制御に絶対必要
+				
 				fixed4 c;
-				c.rgb = s.Alpha * (diff + (spec * s.Specular) + ReflectProbeColor.xyz ) * s.Albedo * atten * 2 * _LightColor0.rgb * NdotL;
-				c.a = s.Alpha; 
+				c.rgb = ((s.Albedo * _Color.rgb) + (s.Albedo * spec *  s.Specular ) ) * (_LightColor0.rgb * NdotL * atten * 2) + UNITY_LIGHTMODEL_AMBIENT.rgb ;
+				c.a = s.Alpha;
 				return c;
 			}
-		ENDCG
+		ENDCG	
 	}
 	FallBack "Transparent/Cutout/VertexLit"
 }
