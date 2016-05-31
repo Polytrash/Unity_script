@@ -1,118 +1,156 @@
-﻿Shader "Unlit/DoFParticle"
-{
+﻿Shader "Unlit/DoFParticle"{
 
     Properties {
 //        _Color ("Main Color", Color) = (1,1,1,1)
-        _NearTex ("Base (RGB)", 2D) = "white" {}
-        _Near("Near", Range(0, 10)) = 1
-        _Middle("Middle", Range(0, 10)) = 2
-        _Far("Far", Range(0, 10)) = 3
+        _MainTex ("Base (RGB)", 2D) = "white" {}
+        _Zero("Zero ", Range(0, 100)) = 10
+        _One("One", Range(0, 100)) = 20
+        _Two("Two", Range(0, 100)) = 30
+        _Three("Three", Range(0, 100)) = 40
+        _Four("Four", Range(0, 100)) = 50
+        _Five("Five", Range(0, 100)) = 60
+        _Six("Six", Range(0, 100)) = 70
 
     }
     SubShader {
-       	Tags{ "Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent"}
-       	Cull Back
+    	Pass{
+       	Tags{ "Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent" }
+       	LOD 200
+
+       	ZWrite OFF
+       	Blend SrcAlpha OneMinusSrcAlpha
 
         CGPROGRAM
-        #pragma surface surf Lambert alpha 
-        #pragma vertex:vert 
-        #pragma surface:surf
+    
+        #pragma vertex vert 
+        #pragma fragment frag
         //#pragma glsl
-        #pragma target 3.0
+        #include "UnityCG.cginc"
 
 
 
-        sampler2D _NearTex;
-        float _Near;
-        float _Middle;
-        float _Far;
+        uniform sampler2D _MainTex;
+        uniform float _Near;
+        uniform float _Middle;
+        uniform float _Far;
+
+        uniform float _Zero;
+        uniform float _One;
+        uniform float _Two;
+        uniform float _Three;
+        uniform float _Four;
+        uniform float _Five;
+        uniform float _Six;
+
+
+        uniform float dist;
+
+
+
 
  
-        struct Input {
-            float4 c;
-           	fixed2 uv_NearTex;
-			fixed3 tangent_input;
+        struct vertexInput {
+
+			float4 vertex : POSITION;
+			float4 color : COLOR;
+			float3 normal : NORMAL;
+			float4 texcoord : TEXCOORD0;
+			float3 dist : TEXCOORD1;
 
         };
-       
-        void vert(inout appdata_full v, out Input o)
+
+        struct vertexOutput {
+
+        	float4 pos : SV_POSITION;
+        	float4 color : COLOR;
+        	float4 texcoord : TEXCOORD0;
+        	float3 posWorld : TEXCOORD1;
+        	float3 norDir : TEXCOORD2;
+        	float3 dist : TEXCOORD3;
+
+        };
+
+
+        vertexOutput vert(vertexInput v)
         {    
-        	fixed4 color;
-        	float3 vertexPos = mul(_Object2World, v.vertex).xyz;
-            float dist = distance(vertexPos, _WorldSpaceCameraPos.xyz);
+        	vertexOutput o;
 
 
-
-        	if(dist < _Near)
-        	{
-
-            	float4 tex = tex2Dlod (_NearTex, float4(v.texcoord.xy, 0, 10));
-             	//v.vertex.x += tex.r  + tex.g  + tex.b ;
-            	//v.vertex.y += tex.r  + tex.g  + tex.b ;
+            o.posWorld = mul(_Object2World, v.vertex);
+            o.norDir = normalize(mul(float4(v.normal, 0.0), _World2Object).xyz);
+            o.pos = mul(UNITY_MATRIX_MVP, v.vertex);
+            o.texcoord = v.texcoord;
 
 
-            	uint idx = color.r*255 + color.g * 255 + color.b * 255;
-            	float2 uv = 1.0 / 512;
-            	uv.x *= 0.5;
-            	float4 texCoord = float4((float)idx * uv.x, uv.y ,0, 2.5);	
-            		
-        	}else if(dist > _Near) {
+            o.dist = float3(distance(o.posWorld, _WorldSpaceCameraPos.xyz), 0, 0);          
+
+            return o;
+
+        }
+
+        float4 frag(vertexOutput i) : COLOR{
 
 
-            	float4 tex = tex2Dlod (_NearTex, float4(v.texcoord.xy, 0, 5));
-            	//v.vertex.x += tex.r  + tex.g  + tex.b ;
-            	//v.vertex.y += tex.r  + tex.g  + tex.b ;
+        	float3 normalDirection = i.norDir;
+        	float3 viewDirection = normalize(_WorldSpaceCameraPos.xyz - i.posWorld.xyz);
+        	float4 tex;
 
+        	if(i.dist.r < _Zero){
 
-            	uint idx = color.r*255 + color.g * 255 + color.b * 255;
-            	float2 uv = 1.0 / 512;
-            	uv.x *= 0.5;
-            	float4 texCoord = float4((float)idx * uv.x, uv.y ,0, 0);
-
-        	}else if(dist > _Middle){
-
-
-            	float4 tex = tex2Dlod (_NearTex, float4(v.texcoord.xy, 0, 0));
-               	//v.vertex.x += tex.r  + tex.g  + tex.b ;
-            	//v.vertex.y += tex.r  + tex.g  + tex.b ;
-
-
-            	uint idx = color.r*255 + color.g * 255 + color.b * 255;
-            	float2 uv = 1.0 / 512;
-            	uv.x *= 0.5;
-            	float4 texCoord = float4((float)idx * uv.x, uv.y ,0, 0);
-
-
-        	}else{
-
-          	
-            	float4 tex = tex2Dlod (_NearTex, float4(v.texcoord.xy, 0, 0));
-              	//v.vertex.x += tex.r  + tex.g  + tex.b ;
-            	//v.vertex.y += tex.r  + tex.g  + tex.b ;
-
-
-            	uint idx = color.r*255 + color.g * 255 + color.b * 255;
-            	float2 uv = 1.0 / 512;
-            	uv.x *= 0.5;
-            	float4 texCoord = float4((float)idx * uv.x, uv.y ,0, 0);
-
-
+        	tex = tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 7));
 
         	}
-        	           
+        	else if(i.dist.r >= _Zero && i.dist.r < _One){
 
-        }
+        	tex = tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 6));
+
+        	}
+        	else if(i.dist.r >= _One && i.dist.r < _Two){
+
+        	tex = tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 5));
+        
+        	}
+        	else if(i.dist.r >= _Two && i.dist.r < _Three){
+
+        	tex = tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 4));
+
+        	}
+        	else if(i.dist.r >= _Three && i.dist.r < _Four){
+
+        	tex = tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 3));
+
+        	}
+        	else if(i.dist.r >= _Four && i.dist.r < _Five){
+
+        	tex = tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 2));
+
+        	}
+        	else if(i.dist.r >= _Five && i.dist.r < _Six){
+
+        	tex = tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 1));
+
+        	}
+        	else if(i.dist.r <= _Six){
+
+        	tex = tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 0));
+
+        	}
+
+        	else{
+
+        	tex = tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 0));
+
+        	}
+
+        	tex.a = tex.a;
+
+ 			return tex;       	           
+ 			      
  
-        void surf (Input IN, inout SurfaceOutput o) {
-
-        	fixed4 c = tex2D(_NearTex, IN.uv_NearTex);
-            o.Albedo = c.rgb;
-            o.Alpha = c.a;
-
-
-
         }
+
         ENDCG
+        }
     }
     FallBack "Diffuse"
 }
