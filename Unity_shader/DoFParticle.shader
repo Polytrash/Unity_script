@@ -1,83 +1,192 @@
-﻿Shader "IE/RadialBlurFilter" {
- 
-    Properties
-    {
+﻿Shader "Particles/DoFParticle"{
+
+    Properties {
+//        _Color ("Main Color", Color) = (1,1,1,1)
         _MainTex ("Base (RGB)", 2D) = "white" {}
-        _SampleDist ("SampleDist", Float) = 1
-        _SampleStrength ("SampleStrength", Float) = 2.2
+        _TintColor("Tint Color", Color) = (0.5, 0.5, 0.5, 0.5)
+        _InvFade("Soft Particle Factor", Range(0.01, 3.0)) = 1.0
+
+
+        _Zero("Zero ", Range(0, 100)) = 10
+        _One("One", Range(0, 100)) = 20
+        _Two("Two", Range(0, 100)) = 30
+        _Three("Three", Range(0, 100)) = 40
+        _Four("Four", Range(0, 100)) = 50
+        _Five("Five", Range(0, 100)) = 60
+        _Six("Six", Range(0, 100)) = 70
+
     }
+Category{
+       	Tags{ "Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent" }
+       	Blend SrcAlpha OneMinusSrcAlpha
+       	ColorMask RGB
+       	Cull Off Lighting Off ZWrite Off
+       	LOD 200
+
+    SubShader {
+    	Pass{
+        CGPROGRAM
+    
+        #pragma vertex vert 
+        #pragma fragment frag
+        //#pragma glsl
+        #include "UnityCG.cginc"
+
+
+
+        uniform sampler2D _MainTex;
+        uniform float4 _MainTex_ST;
+
+        uniform fixed4 _TintColor;
+        uniform float _Near;
+        uniform float _Middle;
+        uniform float _Far;
+
+        uniform float _Zero;
+        uniform float _One;
+        uniform float _Two;
+        uniform float _Three;
+        uniform float _Four;
+        uniform float _Five;
+        uniform float _Six;
+
+
+        uniform float dist;
+
+
+
+
  
-    SubShader
-    {
-        Pass
-        {
-            ZTest Always Cull Off ZWrite Off
-            Fog { Mode off }
+        struct vertexInput {
+
+			float4 vertex : POSITION;
+			float4 color : COLOR;
+			float2 texcoord : TEXCOORD0;
+			float3 dist : TEXCOORD1;
+
+        };
+
+        struct vertexOutput {
+
+        	float4 vertex : SV_POSITION;
+        	float4 color : COLOR;
+        	float2 texcoord : TEXCOORD0;
+
+        	UNITY_FOG_COORDS(1)
+        	#ifdef SOFTPARTICLES_ON
+        	float4 projPos : TEXCOORD1;
+        	#endif
+        	float3 posWorld : TEXCOORD2;
+        	float3 dist : TEXCOORD3;
+
+        };
+
+
+
+
+        vertexOutput vert(vertexInput v)
+        {    
+        	vertexOutput o;
+
+        	o.posWorld = mul(_Object2World, v.vertex);
+            o.vertex = mul(UNITY_MATRIX_MVP, v.vertex);
+            #ifdef SOFTPARTICLES_ON
+            o.pojPos = ComputeScreenPos(o.vertex);
+            COMPUTE_EYEDEPTH(o.projPos.z);
+            #endif
+            o.color = v.color;
+            o.texcoord = TRANSFORM_TEX(v.texcoord, _MainTex);
+            UNITY_TRANSFER_FOG(o, o.vertex);
+
+            o.dist = float3(distance(o.posWorld, _WorldSpaceCameraPos.xyz), 0, 0);          
+
+            return o;
+
+        }
+
+
+
+
+        float4 frag(vertexOutput i) : SV_Target{
+
+        	#ifdef SOFTPARTICLES_ON
+        	float sceneZ = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.projPos)));
+        	float partZ = i.projPos.z;
+        	float fade = saturate(_InvFade * (sceneZ - partZ));
+        	i.color.a *= fade;
+        	#endif
+
+        	float4 col;
+
+        	if(i.dist.r < _Zero){
+
+
+        	col =  2.0f * i.color * _TintColor * tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 7));
+        	UNITY_APPLY_FOG(i.fogCoord, col);
+
+        	}
+        	else if(i.dist.r >= _Zero && i.dist.r < _One){
+
+        	col =  2.0f * i.color * _TintColor * tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 6));
+        	UNITY_APPLY_FOG(i.fogCoord, col);
+
+        	}
+        	else if(i.dist.r >= _One && i.dist.r < _Two){
+
+        	col =  2.0f * i.color * _TintColor * tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 5));
+        	UNITY_APPLY_FOG(i.fogCoord, col);
+        
+        	}
+        	else if(i.dist.r >= _Two && i.dist.r < _Three){
+
+        	col =  2.0f * i.color * _TintColor * tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 4));
+        	UNITY_APPLY_FOG(i.fogCoord, col);
+
+        	}
+        	else if(i.dist.r >= _Three && i.dist.r < _Four){
+
+        	col =  2.0f * i.color * _TintColor * tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 3));
+        	UNITY_APPLY_FOG(i.fogCoord, col);
+
+        	}
+        	else if(i.dist.r >= _Four && i.dist.r < _Five){
+
+        	col =  2.0f * i.color * _TintColor * tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 2));
+        	UNITY_APPLY_FOG(i.fogCoord, col);
+
+        	}
+        	else if(i.dist.r >= _Five && i.dist.r < _Six){
+
+        	col =  2.0f * i.color * _TintColor * tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 1));
+        	UNITY_APPLY_FOG(i.fogCoord, col);
+
+        	}
+        	else if(i.dist.r <= _Six){
+
+        	col =  2.0f * i.color * _TintColor * tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 0));
+        	UNITY_APPLY_FOG(i.fogCoord, col);
+
+        	}
+
+        	else{
+
+         	col =  2.0f * i.color * _TintColor * tex2Dlod(_MainTex, float4(i.texcoord.xy, 0.0, 0));
+        	UNITY_APPLY_FOG(i.fogCoord, col);
+
+
+        	}
+
+        	col.a = col.a;
+
+ 			return col;          
  
-            CGPROGRAM
-            // Upgrade NOTE: excluded shader from DX11, Xbox360, OpenGL ES 2.0 because it uses unsized arrays
-            #pragma exclude_renderers d3d11 xbox360 gles
-            #pragma exclude_renderers xbox360
-            #pragma target 3.0
-            #pragma vertex vert
-            #pragma fragment frag
-            #pragma fragmentoption ARB_precision_hint_fastest
- 
-            #include "UnityCG.cginc"
- 
-            uniform sampler2D _MainTex;
-            uniform float4 _MainTex_ST;
-            uniform float4 _MainTex_TexelSize;
-            float _SampleDist;
-            float _SampleStrength;
- 
-            struct v2f {
-                float4 pos : POSITION;
-                float2 uv : TEXCOORD0;
-            };
- 
-            v2f vert (appdata_img v)
-            {
-                v2f o;
-                o.pos = mul(UNITY_MATRIX_MVP, v.vertex);
-                o.uv = v.texcoord.xy;
-                return o;
-            }
- 
-            float4 frag (v2f i) : COLOR
-            {
-                float2 texCoord = i.uv;
- 
-                #if SHADER_API_D3D9
-                if (_MainTex_TexelSize.y < 0)
-                        texCoord.y = 1 - texCoord.y;
-                #endif
- 
-                float2 dir = 0.5 - texCoord;
- 
-                float dist = length(dir);
- 
-                dir /= dist;
- 
-                float4 color = tex2D(_MainTex, texCoord);
- 
-                float4 sum = color;
- 
-                float samples[10] = float[](-0.08,-0.05,-0.03,-0.02,-0.01,0.01,0.02,0.03,0.05,0.08);
- 
-                for (int i = 0; i < 10; ++i)
-                {
-                    sum += tex2D(_MainTex, texCoord + dir * samples[i] * _SampleDist);
-                }
- 
-                sum *= 1.0 / 11.0;
- 
-                float t = saturate(dist * _SampleStrength);
- 
-                return lerp(color, sum, t);
-            }
-            ENDCG
+        }
+
+        ENDCG
         }
     }
-    Fallback off
+    FallBack "Diffuse"
+}
+
+
 }
