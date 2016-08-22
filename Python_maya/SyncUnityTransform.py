@@ -2,6 +2,7 @@
 
 import maya.cmds as cmds
 import pymel.core as pm
+import maya.api.OpenMaya as om2
 import string as st
 import re
 from xml.etree.ElementTree import Element, SubElement, Comment, tostring, XML
@@ -9,14 +10,17 @@ import xml.etree.ElementTree as et
 
 import xml.dom as minidom
 
+import datetime
+import math 
 
-class objectPlacement(object):
+
+class SyncUnityTransform(object):
 
 
     def __init__(self):
 
-        self.window = 'objectTransformExporterWindow'
-        self.title = 'Object Transform Exporter'
+        self.window = 'SyncUnityTransformWindow'
+        self.title = 'Sync Unity Transform Manager'
         self.size = (300, 300)
         self.height = 300
         self.width = 300
@@ -36,10 +40,12 @@ class objectPlacement(object):
         self.objRotation = []
         self.objScale = []
 
+        self.objMatrix = []
+
     def create(self):
 
-        if cmds.window('objectTransformExporterWindow', exists = True):
-            cmds.deleteUI('objectTransformExporterWindow')
+        if cmds.window('SyncUnityTransformWindow', exists = True):
+            cmds.deleteUI('SyncUnityTransformWindow')
 
 #===================================================================================
 # GUIの定義
@@ -58,12 +64,11 @@ class objectPlacement(object):
         self.textScllist = cmds.textScrollList('objL', ams = True, dkc = self.removeAt)
 
 
-        cmds.checkBox(l = u"リスト内オブジェクトの Rotate Order を Unity仕様(ZXY) に変更", onCommand = self.rotateOrderZXY, offCommand = self.rotateOrderXYZ, rs = True)
-
         cmds.separator (h = 10, w = self.width, style = 'in') 
 
 
         cmds.setParent('..')     
+
 
 #-----------------------------------------------------------------------------------
 # 2.XMLファイルを書き出す
@@ -90,6 +95,7 @@ class objectPlacement(object):
 
         self.exportXmlBtn = cmds.button(l = u"書き出し",command = self.getTransform, height = 30)
 
+        cmds.setParent('..')
 
 #-----------------------------------------------------------------------------------
 # 3.XMLファイルを読み込む
@@ -119,6 +125,7 @@ class objectPlacement(object):
 
         cmds.showWindow()
 
+
 #===================================================================================
 # 汎用メソッドの定義
 #===================================================================================
@@ -136,6 +143,7 @@ class objectPlacement(object):
             print ("XMLファイルに" + str(key) + " の " + str(val) + " 値が入っていません")
         else:
             return val  
+
 
 #-----------------------------------------------------------------------------------
 # オブジェクトタイプチェック	
@@ -158,14 +166,21 @@ class objectPlacement(object):
             shape = cmds.listRelatives(name, s = True, path = True)
             shapeInfo = cmds.objectType(shape)
 
-            
+        # Cameraチェック
         if shapeInfo == 'camera':
-            print("Info: " + name + " is camera, therefore which could not add to the list.")
+            print("Info: " + name + " is a camera, therefore which could not add to the list.")
             type = True
             return type
 
+        # Nurbsチェック
         elif shapeInfo == 'nurbsCurve':
-            print("Info: " + name + " is nurbsCurve, therefore which could not add to the list.")
+            print("Info: " + name + " is a nurbsCurve, therefore which could not add to the list.")
+            type = True
+            return type
+
+        # Locatorチェック
+        elif shapeInfo == 'locator':
+            print("Info: " + name + " is a locator, therefore which could not add to the list.")
             type = True
             return type
 
@@ -173,32 +188,77 @@ class objectPlacement(object):
             type = False
             return type
 
+
+#-----------------------------------------------------------------------------------
+# XYZ / ZXY Rotate Order でトランスフォーム値を取得するためのダミーロケーターを作成
+#-----------------------------------------------------------------------------------
+
+    def rotateOrderReference(self, rotorder,  *args):
+    
+        if(rotorder == 0):
+            # 既に存在するかチェック
+            if cmds.objExists("locatorXYZ"):
+                print("locatorXYZ exists already.")
+
+            else:
+                cmds.spaceLocator(p = (0, 0, 0), n = "locatorXYZ")  
+                cmds.select("locatorXYZ")
+                cmds.setAttr( "locatorXYZ.rotateOrder", 0)
+
+        if(rotorder == 2):
+            # 既に存在するかチェック
+            if cmds.objExists("locatorXYZ"):
+                print("locatorZXY exists already.")
+
+            else:
+                cmds.spaceLocator(p = (0, 0, 0), n = "locatorZXY")  
+                cmds.select("locatorZXY")
+                cmds.setAttr( "locatorZXY.rotateOrder", 2)
+
+        else:
+            
+            print("Info: RotateOrder Input Parameter Error <Sync Unity Transform> ")
+
+
+#-----------------------------------------------------------------------------------
+# マトリックス->トランスフォーム の定義
+#-----------------------------------------------------------------------------------
+
+    def decompMatrix(self, node, matrix, *args):
+        '''
+        API MMatrix.Decomposes を使用. ワールド座標系 : 移動、回転、スケール のリストを返す
+        '''
+        # オブジェクトのローテーションオーダーを取得(ダミーロケーターXYZ or ZXY をセット)
+        rotOrder = cmds.getAttr('%s.rotateOrder'%node)
+ 
+        # マトリックスを mTransformMtx にセット
+        mTransformMtx = om2.MTransformationMatrix(matrix)
+ 
+        # マトリックスから移動値を取得
+        trans = mTransformMtx.translation(om2.MSpace.kWorld)
+ 
+        # マトリックスからオイラー回転値を取得
+        eulerRot = mTransformMtx.rotation()
+ 
+        # オイラー回転値を rotOrder の順番で再定義
+        eulerRot.reorderIt(rotOrder)
+ 
+        # オイラー回転値からXYZ回転値を取得
+        angles = [math.degrees(angle) for angle in (eulerRot.x, eulerRot.y, eulerRot.z)]
+ 
+        # マトリックスからスケール値を取得
+        scale = mTransformMtx.scale(om2.MSpace.kWorld)
+
+        print(trans)
+        print(angles)
+        print(scale)
+
+    
+        return [trans.x,trans.y,trans.z],angles,scale
+
+
+
 #===================================================================================
-# Rotate Order を XYZ に変更
-#===================================================================================
-
-    def rotateOrderXYZ(self, *args):
-        
-        for a in self.exportObjNameList:
-
-            name = str(a)
-
-            cmds.setAttr(name + ".rotateOrder", 0)
-
-
-#===================================================================================
-# Rotate Order を ZXY に変更
-#===================================================================================
-
-    def rotateOrderZXY(self, *args):
-        
-        for a in self.exportObjNameList:
-
-            name = str(a)
-
-            cmds.setAttr(name + ".rotateOrder", 2)
-
-
     
 #===================================================================================
 # 書き出しフォルダ参照メソッドの定義
@@ -210,7 +270,7 @@ class objectPlacement(object):
             uniToStr = str(dialogText)
             dirPath = uniToStr.split("'")[1]
         except Exception:
-            print(u" Info: Export Folder Reference Error: Tool <Object Transform Exporter> 142")			
+            print(u" Info: Export Folder Reference Error: Tool <Sync Unity Transform> ")			
         else:					
             fPath = cmds.textField(self.pathText1, edit=True, text=unicode(dirPath))
             self.dirPath = dirPath
@@ -227,7 +287,7 @@ class objectPlacement(object):
             uniToStr=str(dialogText)
             filePath = uniToStr.split("'")[1]
         except Exception:
-            print(u" Info: Import File Reference Error: Tool <Object Transform Exporter> 159")			
+            print(u" Info: Import File Reference Error: Tool <Sync Unity Transform> ")			
         else:					
             fPath = cmds.textField(self.pathText2, edit=True, text=unicode(filePath))
             self.filePath = filePath
@@ -269,6 +329,7 @@ class objectPlacement(object):
                     else:
 
                         print("")
+
                 i += 1
 
 
@@ -316,13 +377,13 @@ class objectPlacement(object):
         root = Element('UserData')
 
         root.set('version', '1.0')
-        root.append(Comment('Generated at :'))
-        
+        root.append(Comment('Generated at :' + str(datetime.date) + str(datetime.time)))        
 
         tree = et.ElementTree(root)
 
         # オブジェクト名からトランスフォーム取得
 
+        self.rotateOrderReference(2) # rotateOrder ZXY セット用のダミーロケーターを作成
         i = 0
 
         for a in self.exportObjNameList:
@@ -331,9 +392,17 @@ class objectPlacement(object):
 
             cmds.select(self.exportObjNameList[i], replace = True)
 
-            pos = cmds.xform(q = True, ws = True, t = True)
-            rot = cmds.xform(q = True, ws = True, ro = True)
-            scl = cmds.xform(q = True, ws = True, s = True)
+            name = cmds.ls(selection = True)
+
+            # オブジェクトのマトリックスを取得
+            mtrx = om2.MMatrix(cmds.getAttr(str(''.join(name)) + ".matrix"))
+            # マトリックスを一時変数に代入
+            self.objMatrix = self.decompMatrix("locatorZXY", mtrx)
+
+
+            pos = self.objMatrix[0][0],self.objMatrix[0][1], self.objMatrix[0][2]
+            rot = self.objMatrix[1][0],self.objMatrix[1][1], self.objMatrix[1][2]
+            scl = self.objMatrix[2][0],self.objMatrix[2][1], self.objMatrix[2][2]
 
             print(pos)
             print(rot)
@@ -342,10 +411,9 @@ class objectPlacement(object):
             try:
                 self.exportData(root, pos, rot, scl,  self.exportObjNameList[i])
             except Exception:
-                print(u" Info: Data Export Error: Tool <Object Transform Exporter> 266")	
+                print(u" Info: Data Export Error: Tool <Sync Unity Transform> ")	
 
-            i += 1
-        
+            i += 1        
 
         uExportXml = unicode(exportXml)
 
@@ -442,20 +510,23 @@ class objectPlacement(object):
    
         #トランスフォーム実行
         self.transformObject()
+
         
 #===================================================================================
 # オブジェクト複製	
 #===================================================================================   
 
-    def duplicateObject(self, objName, *args):
+    def duplicateObject(self, objName, modifiedName, *args):
 
-        targetName = self.checkDigit(str(objName))
-        print(str(targetName))
+
         # ベースオブジェクトを選択
-        cmds.select(str(targetName), r = True)
+        cmds.select(str(objName), r = True)
         
         # 複製しXMLと合致しなかった名前にリネーム
-        cmds.duplicate(n = objName, rr = True)
+        cmds.duplicate(n = modifiedName, rr = True)
+
+        
+
 
 #===================================================================================
 #  文字列に含まれる数字を削除
@@ -465,17 +536,35 @@ class objectPlacement(object):
 
         numbers = '';
         
-        for c in objName:
-
-            if re.match('^[0-9]{1,}$', c):
-                numbers += c;
-
-        replacedName = str(objName).replace(str(numbers), '')
-
-        return replacedName
+        newName =  re.sub(r'[\d]+', '', objName)
 
 
-   
+        print("objName : " + objName)
+
+        return objName
+
+
+#===================================================================================
+#  文字列に含まれる (*) を _*_に 変換[num = True]もしくは削除[num = False] ※Unityのゲームオブジェクト名(*)への対応
+#=================================================================================== 
+
+    def modifyBrace(self, objName, *args):
+
+        baseName = ''
+        modifiedName = ''
+
+
+        baseName = re.sub(r'[\s(){}[\]]+', '', objName)
+        baseName = re.sub(r'\d+', '', baseName)
+        print("modifiedName True : " + str(modifiedName))
+
+
+        modifiedName = re.sub(r'[\s(){}[\]]+', '_', objName)
+        print("modifiedName False : " + str(modifiedName))
+
+        return baseName, modifiedName   
+
+
 #===================================================================================
 # トランスフォーム実行	
 #===================================================================================    
@@ -527,36 +616,45 @@ class objectPlacement(object):
 
             # トランスフォーム実行
 
-            existsOrNot = cmds.objExists(str(n))
+            # オブジェクト名(*)の名前から、オブジェクト名のみ、オブジェクト名_*_をリストに取得
+            xmlName = self.modifyBrace(str(n))
 
-
-            if (existsOrNot == True):
-
-                cmds.select(str(n), r = True)
-
-                # Rotate Order を ZXY に変更
-                cmds.setAttr(str(n) + ".rotateOrder", 2)
-
-                cmds.xform(a = True, ws = True, ro = [float(xRot), float(yRot), float(zRot)], s = [float(xScl), float(yScl), float(zScl)], t = [float(xPos), float(yPos), float(zPos)])
+            baseExists = cmds.objExists(xmlName[0])
             
-            else :
+            if(baseExists == True):
 
-                print(u" Info: Value is Empty, therefore Transition to duplicate phase...")
+                xmlExists = cmds.objExists(xmlName[1])
 
-                try :
-                    # XMLと合致しなかったのオブジェクトをベースオブジェクトから複製
-                    self.duplicateObject(str(n))
+                if (xmlExists == True):
 
-                    cmds.select(str(n), r = True)
+                    cmds.select(str(xmlName[1]), r = True)
 
                     # Rotate Order を ZXY に変更
-                    cmds.setAttr(str(n) + ".rotateOrder", 2)
+                    cmds.setAttr(str(xmlName[1]) + u".rotateOrder", 2)
+
+                    cmds.xform(a = True, ws = True, ro = [float(xRot), float(yRot), float(zRot)], s = [float(xScl), float(yScl), float(zScl)], t = [float(xPos), float(yPos), float(zPos)])
+            
+                else :
+
+                    print(u" Info: Value is Empty, therefore Transition to duplicate phase...")
+
+                    #try :
+
+                    
+                    # XMLと合致しなかったオブジェクトをベースオブジェクトから複製
+                    self.duplicateObject(xmlName[0], xmlName[1])
+
+                    cmds.select(str(xmlName[1]), r = True)
+
+                    # Rotate Order を ZXY に変更
+                    cmds.setAttr(str(xmlName[1]) + u".rotateOrder", 2)
 
                     cmds.xform(a = True, ws = True, ro = [float(xRot), float(yRot), float(zRot)], s = [float(xScl), float(yScl), float(zScl)], t = [float(xPos), float(yPos), float(zPos)])
 
 
-                except:
-                    print(u" Info: duplicate Error: Tool <Object Transform Exporter> 402")
+                    # except:
+                    #print(u" Info: duplicate Error: Tool <Sync Unity Transform>")
+
 
             # ローカル辞書をクリア
             positionList.clear()
@@ -574,6 +672,6 @@ class objectPlacement(object):
           
                  
 
-objectPlacer = objectPlacement()
+syncUnity = SyncUnityTransform()
 
-objectPlacer.create()
+syncUnity.create()
