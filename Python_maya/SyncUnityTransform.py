@@ -333,8 +333,9 @@ class SyncUnityTransform(object):
                 i += 1
 
 
-        #print(self.exportObjNameList)
-
+#===================================================================================
+# textScrollListから選択項目を削除	
+#===================================================================================
 
     def removeAt(self, *args):
 
@@ -367,7 +368,7 @@ class SyncUnityTransform(object):
         fileName = cmds.textField('fileNameF1', query =True, text = True)
         
         exportXml = sourceWorkspaceName + fileName + ".xml"
-
+                
         print exportXml
 
 
@@ -396,9 +397,8 @@ class SyncUnityTransform(object):
 
             # オブジェクトのマトリックスを取得
             mtrx = om2.MMatrix(cmds.getAttr(str(''.join(name)) + ".matrix"))
-            # マトリックスを一時変数に代入
+            # マトリックスを一時的に変数に代入
             self.objMatrix = self.decompMatrix("locatorZXY", mtrx)
-
 
             pos = self.objMatrix[0][0],self.objMatrix[0][1], self.objMatrix[0][2]
             rot = self.objMatrix[1][0],self.objMatrix[1][1], self.objMatrix[1][2]
@@ -408,8 +408,12 @@ class SyncUnityTransform(object):
             print(rot)
             print(scl)
 
+            tmpName = self.UnderScoreToSharp(self.exportObjNameList[i])
+            print(tmpName)
             try:
-                self.exportData(root, pos, rot, scl,  self.exportObjNameList[i])
+               
+                self.exportData(root, pos, rot, scl,  tmpName)
+
             except Exception:
                 print(u" Info: Data Export Error: Tool <Sync Unity Transform> ")	
 
@@ -427,7 +431,8 @@ class SyncUnityTransform(object):
 #=================================================================================== 
 
     def exportData(self, root, pos, rot, scl, name, *args):
-        
+
+
         nameXpos = name + 'xPos'
         nameYpos = name + 'yPos'
         nameZpos = name + 'zPos'
@@ -523,9 +528,7 @@ class SyncUnityTransform(object):
         cmds.select(str(objName), r = True)
         
         # 複製しXMLと合致しなかった名前にリネーム
-        cmds.duplicate(n = modifiedName, rr = True)
-
-        
+        cmds.duplicate(n = modifiedName, rr = True)        
 
 
 #===================================================================================
@@ -538,31 +541,41 @@ class SyncUnityTransform(object):
         
         newName =  re.sub(r'[\d]+', '', objName)
 
-
         print("objName : " + objName)
 
         return objName
 
 
 #===================================================================================
-#  文字列に含まれる (*) を _*_に 変換[num = True]もしくは削除[num = False] ※Unityのゲームオブジェクト名(*)への対応
+#  文字列に含まれる #*# を _*_に 変換[num = True]もしくは削除[num = False] ※Unityのゲームオブジェクト名(*)への対応
 #=================================================================================== 
 
-    def modifyBrace(self, objName, *args):
+    def SharpToUnderscore(self, objName, *args):
 
-        baseName = ''
+        splittedName = []
         modifiedName = ''
 
+        splittedName = objName.split('#')
 
-        baseName = re.sub(r'[\s(){}[\]]+', '', objName)
-        baseName = re.sub(r'\d+', '', baseName)
-        print("modifiedName True : " + str(modifiedName))
+        print("modifiedName True : " + str(splittedName))
 
 
-        modifiedName = re.sub(r'[\s(){}[\]]+', '_', objName)
+        # # シャープ
+        modifiedName = re.sub(r"([#?])", "_", objName)
         print("modifiedName False : " + str(modifiedName))
 
-        return baseName, modifiedName   
+        return splittedName[0], modifiedName   
+
+
+#===================================================================================
+#  文字列に含まれる _*_ を #*#に 変換 ※オブジェクト名以降のみ
+#=================================================================================== 
+
+    def UnderScoreToSharp(self, objName, *args):
+
+        replacedName = re.sub(r"_", "#", objName)
+        
+        return replacedName   
 
 
 #===================================================================================
@@ -617,7 +630,7 @@ class SyncUnityTransform(object):
             # トランスフォーム実行
 
             # オブジェクト名(*)の名前から、オブジェクト名のみ、オブジェクト名_*_をリストに取得
-            xmlName = self.modifyBrace(str(n))
+            xmlName = self.SharpToUnderscore(str(n))
 
             baseExists = cmds.objExists(xmlName[0])
             
@@ -637,9 +650,6 @@ class SyncUnityTransform(object):
                 else :
 
                     print(u" Info: Value is Empty, therefore Transition to duplicate phase...")
-
-                    #try :
-
                     
                     # XMLと合致しなかったオブジェクトをベースオブジェクトから複製
                     self.duplicateObject(xmlName[0], xmlName[1])
@@ -652,11 +662,7 @@ class SyncUnityTransform(object):
                     cmds.xform(a = True, ws = True, ro = [float(xRot), float(yRot), float(zRot)], s = [float(xScl), float(yScl), float(zScl)], t = [float(xPos), float(yPos), float(zPos)])
 
 
-                    # except:
-                    #print(u" Info: duplicate Error: Tool <Sync Unity Transform>")
-
-
-            # ローカル辞書をクリア
+            # ローカルディクショナリーをクリア
             positionList.clear()
             rotationList.clear()
             scaleList.clear()
