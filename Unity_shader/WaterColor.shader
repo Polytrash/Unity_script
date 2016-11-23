@@ -1,4 +1,4 @@
-Shader "Anime" {
+Shader "WaterColor" {
     Properties {
 		// カラー
 		[HDR]_BaseModifyColor ("Base Modify Color", Color) = (0,0,0,1)
@@ -39,7 +39,7 @@ Shader "Anime" {
 		[MaterialToggle] _IgnoreNormal ("Ignore Normal (Default:OFF)", Float ) = 0
  		_Outline_Vector ("XYZ Offset", VECTOR) = (0.1,0.1,0)
 		//_Scribbliness("Scribbliness", Float) = 0.01
-					
+		_NoiseFactor ("Noise Factor", Range(0, 1)) = 0.3			
 
 
     }
@@ -54,7 +54,7 @@ Shader "Anime" {
         Pass {
             Name "Outline"
             Tags {
-			"Queue" = "Overlay" 
+			"Queue" = "Cutout" 
             }
 
 			ZWrite On  
@@ -98,6 +98,7 @@ Shader "Anime" {
                 float2 texcoord : TEXCOORD0;
 				float4 color : COLOR;
 				float3 normal : NORMAL;
+				
                 UNITY_FOG_COORDS(1)
             };
 
@@ -111,6 +112,30 @@ Shader "Anime" {
 				return norm;
 			}
 
+ 			// ノイズ生成用ハッシュ関数
+
+			float hash( float n )
+			{
+				return frac(sin(n)*43758.5453);
+			}
+
+			// ノイズ関数
+
+			float noise( float3 x )
+			{
+			// The noise function returns a value in the range -1.0f -> 1.0f
+
+				float3 p = floor(x);
+				float3 f = frac(x);
+
+					   f = f*f*(3.0-2.0*f);
+					   float n = p.x + p.y*57.0 + 113.0*p.z;
+
+				return lerp(lerp(lerp( hash(n+0.0), hash(n+1.0),f.x),
+						lerp( hash(n+57.0), hash(n+58.0),f.x),f.y),
+						lerp(lerp( hash(n+113.0), hash(n+114.0),f.x),
+						lerp( hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
+			}	
 //----------------------------------------------------------------------------//
 
 			////////////////////////////////////
@@ -132,7 +157,7 @@ Shader "Anime" {
 					o.pos.x +=  o.pos.x * (v.color.r + 0.5) * _Outline_Width * 0.01 * _Outline_Vector.x;
 					o.pos.y +=  o.pos.y * (v.color.r + 0.5) * _Outline_Width * 0.01 * _Outline_Vector.y;
 					o.pos.z +=  o.pos.z * (v.color.r + 0.5) * _Outline_Width * 0.01 * _Outline_Vector.z;	
-				
+					o.texcoord = ComputeScreenPos(o.pos);		// 追加11/23
 				#endif
 				o.color = _Line_Color;
 				UNITY_TRANSFER_FOG(o,o.pos);
@@ -140,7 +165,7 @@ Shader "Anime" {
 
 
 			}
-
+		
 			////////////////////////////////////
 			//								  //
 			//         FragmentShader         //
@@ -150,7 +175,13 @@ Shader "Anime" {
             float4 frag(VertexOutput i, float facing : VFACE) : COLOR {
                 float isFrontFace = ( facing >= 0 ? 1 : 0 );
                 float faceSign = ( facing >= 0 ? 1 : -1 );
-                float4 _BaseTex_var = tex2D(_MainTex,TRANSFORM_TEX(i.texcoord, _MainTex)); // 通常Color用テクスチャ
+
+				float2 screenUV = i.texcoord.xy / i.pos.w * 2.0;  // 追加11/23
+                float4 _BaseTex_var = tex2D(_MainTex,TRANSFORM_TEX(screenUV.xy, _MainTex)); // 通常Color用テクスチャ
+							   float n = noise(i.pos.xyz);
+				float4 color = tex2D(_MainTex, screenUV.xy);   
+				if(n < 0.3) discard;	   // 追加11/23
+
                 return fixed4(_Line_Color.rgb,0);
             }
 
@@ -225,6 +256,7 @@ Shader "Anime" {
             uniform fixed  _HighlightScale;
 			
 			uniform fixed4 _Random;
+			uniform float  _NoiseFactor;
             
 			struct VertexInput {
                 float4 vertex : POSITION;
@@ -249,6 +281,31 @@ Shader "Anime" {
                 UNITY_FOG_COORDS(7)
 								
             };
+
+			// ノイズ生成用ハッシュ関数
+
+			float hash( float n )
+			{
+				return frac(sin(n)*43758.5453);
+			}
+
+			// ノイズ関数
+
+			float noise( float3 x )
+			{
+			// The noise function returns a value in the range -1.0f -> 1.0f
+
+				float3 p = floor(x);
+				float3 f = frac(x);
+
+					   f = f*f*(3.0-2.0*f);
+					   float n = p.x + p.y*57.0 + 113.0*p.z;
+
+				return lerp(lerp(lerp( hash(n+0.0), hash(n+1.0),f.x),
+						lerp( hash(n+57.0), hash(n+58.0),f.x),f.y),
+						lerp(lerp( hash(n+113.0), hash(n+114.0),f.x),
+						lerp( hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
+			}	
 
 			////////////////////////////////////
 			//								  //
@@ -275,9 +332,8 @@ Shader "Anime" {
                 UNITY_TRANSFER_FOG(o,o.pos);
                 TRANSFER_VERTEX_TO_FRAGMENT(o)
                 return o;
-            }
-			
-
+            } 
+   
 			////////////////////////////////////
 			//								  //
 			//         FragmentShader         //
@@ -308,8 +364,8 @@ Shader "Anime" {
 
 				float attenuation = 1.0;	
 
-
-			
+				float n = noise(i.pos.xyz * _NoiseFactor);
+				
 
 
 ////// Lighting ////// 
@@ -328,8 +384,8 @@ Shader "Anime" {
 				float4 kageModify_var;
 				   
 				// スペキュラライト
-				float3 specularLighting = saturate(pow(max(0.0, dot( reflect(-lightDirection, lerp(i.normalDir, normalDirection, _BorderNormal)), viewDirection)),_Shininess))* _LightColor0 * attenuation  * _Spec_Color.rgb  *_SpecMaskMap_var.r * _KageMaskMap_var.r * _Spec_Power ;
-				
+				float3 specularLighting = pow(max(0.0, dot( reflect(-lightDirection, lerp(i.normalDir, normalDirection, _BorderNormal*5)), viewDirection)),_Shininess)* _LightColor0  * _Spec_Color.rgb  *_SpecMaskMap_var.r * _KageMaskMap_var.r * _Spec_Power ;
+				// 旧スペキュラライト float3 specularLighting = saturate(pow(max(0.0, dot( reflect(-lightDirection, lerp(i.normalDir, normalDirection, _BorderNormal)), viewDirection)),_Shininess))* _LightColor0 * attenuation  * _Spec_Color.rgb  *_SpecMaskMap_var.r * _KageMaskMap_var.r * _Spec_Power ;				
 				// リムライト
 				float rim =  1 -  saturate(dot( i.normalDir, viewDirection));			
 				float3 rimLighting =  _Rim_Color * saturate(dot(normalDirection, viewDirection)) * pow(rim * _Rim_Width, _Rim_Power);
@@ -347,7 +403,12 @@ Shader "Anime" {
 				baseModify_var.r = (1 - blendAmount) * _BaseTex_var.r + (1.0 - (1 - blendAmount)) * _BaseModifyColor.r;
 				baseModify_var.g = (1 - blendAmount) * _BaseTex_var.g + (1.0 - (1 - blendAmount)) * _BaseModifyColor.g;
 				baseModify_var.b = (1 - blendAmount) * _BaseTex_var.b + (1.0 - (1 - blendAmount)) * _BaseModifyColor.b;
-				baseModify_var.a = 1;
+				baseModify_var.a = 1;	   
+
+				baseModify_var.r =  1 - (1 - baseModify_var.r) * (1 - n);
+				baseModify_var.g =  1 - (1 - baseModify_var.g) * (1 - n);
+				baseModify_var.b =  1 - (1 - baseModify_var.b) * (1 - n);
+  				baseModify_var.a = 1;
 
 				// 影カラー調整
 				kageModify_var.r = blendAmount * (_KageTex_var.r + (1.0 -  blendAmount)) + _KageModifyColor.r;
@@ -355,11 +416,17 @@ Shader "Anime" {
 				kageModify_var.b = blendAmount * (_KageTex_var.b + (1.0 -  blendAmount)) + _KageModifyColor.b;
 				kageModify_var.a = 1;
 
-				
+				kageModify_var.r =  1 - (1 - baseModify_var.r) * (1 - n);
+				baseModify_var.g =  1 - (1 - baseModify_var.g) * (1 - n);
+				baseModify_var.b =  1 - (1 - baseModify_var.b) * (1 - n);
+  				baseModify_var.a = 1;
+
+				float3 kage = 1 - (1 - _KageTex_var)   + (1 - (pow(float3(n, n, n), _BaseTex_var.a * 10 )) ); ;
+				float3 base = 1 - (1 - _BaseTex_var)   + (1 - (pow(float3(n, n, n), _BaseTex_var.a * 10 )) ); ;
 
 				// シェーディング計算
-                float3 emissive =lerp( _KageTex_var * kageModify_var + rimLighting + UNITY_LIGHTMODEL_AMBIENT.rgb * _LightColor0 ,
-									    _BaseTex_var * baseModify_var + rimLighting  + (specularLighting * _KageMaskMap_var.r)  + UNITY_LIGHTMODEL_AMBIENT.rgb * _LightColor0 ,				
+                float3 emissive =lerp( lerp(_KageTex_var, _KageTex_var * kage * _KageModifyColor, _BaseTex_var.a * 0.5) + rimLighting + UNITY_LIGHTMODEL_AMBIENT.rgb * _LightColor0 ,
+									   lerp(_BaseTex_var, _BaseTex_var * base * _BaseModifyColor, _BaseTex_var.a * 0.5) + rimLighting  + (specularLighting * _KageMaskMap_var.r)  + UNITY_LIGHTMODEL_AMBIENT.rgb * _LightColor0 ,				
 				
 								 // ベース(スペキュラ)と影カラーのブレンド
 								  blendAmount * _KageMaskMap_var.r )
@@ -368,10 +435,10 @@ Shader "Anime" {
 								 + ((blendedColor * _HighlightColor ) * _HighlightMaskMap_var) ;
 
 								 // 環境光
-;
 
 
-				float3 finalColor = emissive ;
+
+				float3 finalColor = emissive;
                 fixed4 finalRGBA = fixed4(finalColor,_BaseTex_var.a);
 
 				// The UNITY_FOG_COORDS マクロはフォグの座標を保持する構造体を生成する
