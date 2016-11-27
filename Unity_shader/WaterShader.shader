@@ -37,7 +37,8 @@ Properties {
 	_WaveTile1("Wave Tile X", Range(10, 500)) = 400
 	_WaveTile2("Wave Tile Y", Range(10, 500)) = 400
 
-
+ 	_MaskMap("Mask texture", 2D) = "bump" {}
+    _Fade ("Fade", Range (0.1,1.0)) = 0.5
 
 
 	causticsOffsetAndScale("internal caustics animation offset and scale", Vector) = (.0, .0, .25, .0)
@@ -62,8 +63,8 @@ Category {
 			#include "AutoLight.cginc"
 
 	
-	uniform sampler2D _MainTex, _WaterMap, _WaterWetness, _SecondaryRefractionTex, _AnisoMap ,_CausticsAnimationTexture, _DUDVFoamMap,  _FoamDiffuse;
-	uniform float4 _MainTex_ST , _WaterMap_ST, _WaterWetness_ST, _SecondaryRefractionTex_ST, _AnisoMap_ST ,_CausticsAnimationTexture_ST, _DUDVFoamMap_ST;
+	uniform sampler2D _MainTex, _WaterMap, _WaterWetness, _SecondaryRefractionTex, _AnisoMap ,_CausticsAnimationTexture, _DUDVFoamMap,  _FoamDiffuse, _MaskMap ;
+	uniform float4 _MainTex_ST , _WaterMap_ST, _WaterWetness_ST, _SecondaryRefractionTex_ST, _AnisoMap_ST ,_CausticsAnimationTexture_ST, _DUDVFoamMap_ST, _MaskMap_ST;
 	uniform samplerCUBE _Cube;
 
 	uniform half _Reflectivity;
@@ -95,6 +96,7 @@ Category {
 	uniform half _WaveTile2;
 
 
+    uniform float _Fade;
 
 	uniform half _refractionsWetness; 
 	uniform half _Opaqueness;
@@ -113,6 +115,9 @@ Category {
 		float4  islandFoam : TEXCOORD3;
 		float2  uv_Aniso : TEXCOORD4;
      	float2  uv_SecondaryRefrTex : TEXCOORD5;
+		// screenSpace specMask
+		float4  screenPos : TEXCOORD6;
+		// screenSpace specMask
 	};
 	
 	////////////////////////////////////
@@ -152,8 +157,9 @@ Category {
 	    o.viewDir = WorldSpaceViewDir(a.vertex);	
 	    o.lightDir = normalize(WorldSpaceLightDir( a.vertex ));	  
 		o.uv_SecondaryRefrTex = TRANSFORM_TEX (a.texcoord, _SecondaryRefractionTex);
-
-
+		// screenSpace specMask
+		o.screenPos = ComputeScreenPos(o.pos);
+		// screenSpace specMask
 	    
 
 
@@ -208,7 +214,7 @@ Category {
 	////////////////////////////////////
 	
 	inline fixed3 CombineEffectsWithLighting( fixed3 refraction, half refrStrength,	fixed3 reflection,  fixed3 pNormal,
-												fixed3 normViewDir,	fixed3 normLightDir, half2 uv_MainTex, half2 uv_Aniso, half waterAttenuationValue, half waterWetnessValue,
+												fixed3 normViewDir,	fixed3 normLightDir, half2 uv_MainTex, half2 uv_Aniso, half2 uv, half waterAttenuationValue, half waterWetnessValue,
 												fixed3 foam, fixed3 mask, inout half foamAmount,	fixed foamValue, fixed3 lightDir )
 	{
 		half nDotView = dot(pNormal, normViewDir);		//Masking  
@@ -224,9 +230,14 @@ Category {
 		//half spec = tex2D(_AnisoMap, ( float2(lightDotT, viewDotT) + 1.0 ) * .5).a;		
 		// AnisoMap に AnisoTile を掛けて反射を直接調整
 		half spec = tex2D(_AnisoMap, (   float2(nDotView* _AnisoTileX, viewDotT  * _AnisoTileY  ) + 1.0 ) * .5).a;
+		
+		// screenSpace specMask
+		half specMask = tex2D(_MaskMap, TRANSFORM_TEX(uv, _MaskMap));		
+		 // screenSpace specMask
+		
 		spec = lerp( 0.0, pow(1-spec, _Shininess * 128.0), waterAttenuationValue);
-						  		    
-		fixed specularComponent = spec;
+						  		    			   
+		fixed specularComponent =  spec * specMask * _Fade;
 
 		half fresnel = .5 - nDotView;
 		fresnel = max(0.0, fresnel);
@@ -267,7 +278,12 @@ Category {
 
 	fixed4 frag (v2f i) : COLOR
 	{
-		fixed4 outColor;	
+		fixed4 outColor;
+
+		// screenSpace specMask
+		float2 uv = i.screenPos.xy / i.screenPos.w;
+		 // screenSpace specMask
+	
 		fixed4 waterMapValue = tex2D (_WaterMap, i.uv_WaterMap);		
 		//波打ち際
 		fixed4 waterWetnessValue = tex2D (_WaterWetness, i.uv_WaterMap);	 
@@ -305,7 +321,7 @@ Category {
 		fixed3 mask = tex2D(_WaterMap, i.islandFoam.xy ).rgb * foamAmount;		
 	    // Combine		
 		outColor.rgb = CombineEffectsWithLighting(refrColor, waterMapValue.a, reflectCol, pNormal, normViewDir,
-												 i.lightDir, i.uv_MainTex, i.uv_Aniso,  waterAttenuationValue, waterWetnessValue, foam, mask, foamAmount, foamValue, i.lightDir );
+												 i.lightDir, i.uv_MainTex, i.uv_Aniso, uv, waterAttenuationValue, waterWetnessValue, foam, mask, foamAmount, foamValue, i.lightDir );
 		  		
 		outColor.a = 1;	  
 		//outColor.a *= _Opaqueness;

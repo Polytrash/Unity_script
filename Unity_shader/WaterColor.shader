@@ -39,8 +39,10 @@ Shader "WaterColor" {
 		[MaterialToggle] _IgnoreNormal ("Ignore Normal (Default:OFF)", Float ) = 0
  		_Outline_Vector ("XYZ Offset", VECTOR) = (0.1,0.1,0)
 		//_Scribbliness("Scribbliness", Float) = 0.01
-		_NoiseFactor ("Noise Factor", Range(0, 1)) = 0.3			
-
+		_NoiseFactor ("Noise Factor", Range(0, 1)) = 0.3
+		_NoiseSharpness("Noise Sharpness", Range(-1, 1)) = 0.1			
+		_NoisePower ("Noise Power", Range(0, 1)) = 0.0	
+		_NoiseColor("Noise Color", Color) = (0.5,0.5,0.5,1)	
 
     }
     SubShader {
@@ -112,6 +114,7 @@ Shader "WaterColor" {
 				return norm;
 			}
 
+
  			// ノイズ生成用ハッシュ関数
 
 			float hash( float n )
@@ -125,11 +128,12 @@ Shader "WaterColor" {
 			{
 			// The noise function returns a value in the range -1.0f -> 1.0f
 
-				float3 p = floor(x);
-				float3 f = frac(x);
 
-					   f = f*f*(3.0-2.0*f);
-					   float n = p.x + p.y*57.0 + 113.0*p.z;
+				float3 p = floor(x);
+				float3 f = frac(x);					
+				f = f*f*(3.0-2.0*f);
+
+				float n = p.x + p.y*57.0 + 113.0*p.z;
 
 				return lerp(lerp(lerp( hash(n+0.0), hash(n+1.0),f.x),
 						lerp( hash(n+57.0), hash(n+58.0),f.x),f.y),
@@ -180,7 +184,7 @@ Shader "WaterColor" {
                 float4 _BaseTex_var = tex2D(_MainTex,TRANSFORM_TEX(screenUV.xy, _MainTex)); // 通常Color用テクスチャ
 							   float n = noise(i.pos.xyz);
 				float4 color = tex2D(_MainTex, screenUV.xy);   
-				if(n < 0.3) discard;	   // 追加11/23
+				if(n < 0.4) discard;	   // 追加11/23
 
                 return fixed4(_Line_Color.rgb,0);
             }
@@ -222,7 +226,7 @@ Shader "WaterColor" {
 
             #pragma multi_compile_fwdbase_fullshadows
             #pragma multi_compile_fogBorderNormal
-
+			#pragma fragmentoption ARB_precision_hint_fastest
             #pragma exclude_renderers d3d11_9x xbox360 xboxone ps3 psp2 
             #pragma target 3.0
             #pragma glsl
@@ -257,7 +261,10 @@ Shader "WaterColor" {
 			
 			uniform fixed4 _Random;
 			uniform float  _NoiseFactor;
-            
+            uniform float  _NoisePower;
+			uniform float  _NoiseSharpness;
+			uniform float4  _NoiseColor;
+
 			struct VertexInput {
                 float4 vertex : POSITION;
                 float3 normal : NORMAL;
@@ -275,6 +282,7 @@ Shader "WaterColor" {
                 float3 bitangentDir : TEXCOORD4;
 
 				float2 screenPos : TEXCOORD8;
+				float4 uv : TEXCOORD9;
 
                 
 				LIGHTING_COORDS(5,6)
@@ -318,6 +326,7 @@ Shader "WaterColor" {
                 VertexOutput o = (VertexOutput)0;
 
                 o.texcoord = v.texcoord;
+				o.uv = ComputeGrabScreenPos(o.pos);
 
                 o.normalDir = UnityObjectToWorldNormal(v.normal);
                 o.tangentDir = normalize( mul( unity_ObjectToWorld, float4( v.tangent.xyz, 0.0 ) ).xyz );
@@ -333,7 +342,11 @@ Shader "WaterColor" {
                 TRANSFER_VERTEX_TO_FRAGMENT(o)
                 return o;
             } 
-   
+   			
+			sampler2D _GrabTexture;
+			float4 _GrabTexture_TexelSize;
+			float _Factor;
+
 			////////////////////////////////////
 			//								  //
 			//         FragmentShader         //
@@ -421,12 +434,30 @@ Shader "WaterColor" {
 				baseModify_var.b =  1 - (1 - baseModify_var.b) * (1 - n);
   				baseModify_var.a = 1;
 
-				float3 kage = 1 - (1 - _KageTex_var)   + (1 - (pow(float3(n, n, n), _BaseTex_var.a * 10 )) ); ;
-				float3 base = 1 - (1 - _BaseTex_var)   + (1 - (pow(float3(n, n, n), _BaseTex_var.a * 10 )) ); ;
+				float3 grain = float3(n,n,n);
+
+				#define ADDPIXEL(weight,kernelY) tex2Dproj(_GrabTexture, UNITY_PROJ_COORD(float4(i.uv.x, i.uv.y + _GrabTexture_TexelSize.y * kernelY * _Factor, i.uv.z, i.uv.w))) * weight
+				
+				grain += ADDPIXEL(-.01, 4.0);
+				grain += ADDPIXEL(-.01, 3.0);
+				grain += ADDPIXEL(-.01, 2.0);
+				grain += ADDPIXEL(-.01, 1.0);
+				grain += ADDPIXEL(_NoiseSharpness, 0.0);
+				grain += ADDPIXEL(-.01, -1.0);
+				grain += ADDPIXEL(-.01, -2.0);
+				grain += ADDPIXEL(-.01, -3.0);
+				grain += ADDPIXEL(-.01, -4.0);
+
+				float kage = 1- pow(grain, _BaseTex_var.a * _NoisePower ) ;
+				float base = 1- pow(grain, _BaseTex_var.a * _NoisePower ) ;
+
+
+
+
 
 				// シェーディング計算
-                float3 emissive =lerp( lerp(_KageTex_var, _KageTex_var * kage * _KageModifyColor, _BaseTex_var.a * 0.5) + rimLighting + UNITY_LIGHTMODEL_AMBIENT.rgb * _LightColor0 ,
-									   lerp(_BaseTex_var, _BaseTex_var * base * _BaseModifyColor, _BaseTex_var.a * 0.5) + rimLighting  + (specularLighting * _KageMaskMap_var.r)  + UNITY_LIGHTMODEL_AMBIENT.rgb * _LightColor0 ,				
+                float3 emissive =lerp( lerp( lerp(_KageTex_var, _KageModifyColor, _BaseTex_var.a*0.5) , _NoiseColor, clamp(0.1,.9,kage)* _BaseTex_var.a) + rimLighting + UNITY_LIGHTMODEL_AMBIENT.rgb * _LightColor0 ,
+									   lerp( lerp(_BaseTex_var, _BaseModifyColor, _BaseTex_var.a*0.5) , _NoiseColor, clamp(0.1,.9,base)* _BaseTex_var.a) + rimLighting  + (specularLighting * _KageMaskMap_var.r)  + UNITY_LIGHTMODEL_AMBIENT.rgb * _LightColor0 ,				
 				
 								 // ベース(スペキュラ)と影カラーのブレンド
 								  blendAmount * _KageMaskMap_var.r )
