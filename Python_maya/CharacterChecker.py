@@ -12,9 +12,9 @@ class CharaChecker(object):
     def __init__(self):
         self.window = 'CharaCheckerWindow'
         self.title = 'Character Checker'
-        self.size = (500, 350)
+        self.size = (600, 350)
 
-        self.width = 500
+        self.width = 600
         self.height = 350  
                           
         self.transforms = [] 
@@ -34,7 +34,7 @@ class CharaChecker(object):
         cmds.setParent('..')  
           
         self.modelFrm = cmds.frameLayout(label = u"■ モデル", bgc = (0.2, 0.2, 0.4), cll = True)
-        self.modelChckBox1 = cmds.checkBox(l = u"1. ポリゴン数は ～8000 tri 以下か", bgc = (0.4, 0.0, 0.0), v = True)           
+        cmds.checkBox('modelChckBox1', l = u"1. ポリゴン数は ～8000 tri 以下か", bgc = (0.4, 0.0, 0.0), v = True)           
         self.modelChckBox2 = cmds.checkBox(l = u"2. UVSet は 1つだけになっているか", bgc = (0.2, 0.2, 0.2), v = True)    
         self.modelChckBox3 = cmds.checkBox(l = u"3. UVSet 名が map1 になっているか", bgc = (0.4, 0.0, 0.0), v = True)           
         cmds.setParent('..')        
@@ -47,7 +47,7 @@ class CharaChecker(object):
         self.jntChckBox5 = cmds.checkBox(l = u"5. mant , tail , hair 関連の ジョイント はX軸が子方向に向いているか", bgc = (0.2, 0.2, 0.2), v = True)
         cmds.setParent('..')       
              
-        self.renameBtn = cmds.button( l = u"チェック実行" )   
+        self.renameBtn = cmds.button( l = u"チェック実行" ,command = self.checker )   
         
         cmds.separator (h = 10, w = self.width, style = 'in') 
                 
@@ -59,14 +59,77 @@ class CharaChecker(object):
         cmds.setParent('..')  
   
         cmds.showWindow()  
+#-----------------------------------------------------------------------------------
+# 汎用メソッド	
+#----------------------------------------------------------------------------------- 
 
+#------------------------------#
+# メッシュ検索
+#------------------------------#
+
+    def getAllGeom(self, key, *args):
+        trns = []
+        matched = []            
+        geometry = cmds.ls(typ = "mesh")
+        # self.transforms が empty の場合はすべて取得        
+        if not self.transforms: 
+            self.transforms = cmds.listRelatives(geometry, p=True, path=True)
+        else:
+            trns = cmds.listRelatives(geometry, p=True, path=True)
+            matched = self.diffList(trns, self.transforms) 
+            self.transforms.extend(matched)             
+
+z#------------------------------#
+# list比較
+#------------------------------#
+    
+    def diffList(self, list1, list2, *args):
+        c = set(list1).union(set(list2))
+        d = set(list1).intersection(set(list2))
+        return list(c - d) 
+                           
+#-----------------------------------------------------------------------------------
+# チェック	
+#-----------------------------------------------------------------------------------          
+
+    def checker(self, *args):
         
+        key = ''
+        
+        ret = cmds.checkBox('modelChckBox1', q=True, value=True)        
+
+        self.getAllGeom(key)
+        if ret:
+            self.polyCountCheck(key)
+
 #-----------------------------------------------------------------------------------
 # 命名規則	
 #----------------------------------------------------------------------------------- 
+
+
 #-----------------------------------------------------------------------------------
 # モデル	
 #----------------------------------------------------------------------------------- 
+
+#------------------------------#
+# 1.ポリゴン数チェック
+#------------------------------#
+
+    def polyCountCheck(self, key, *args):
+        
+        polyCount =  []
+        resultCount = 0       
+        self.getAllGeom
+        
+        for a in self.transforms:
+            print (a)
+            cmds.select(a, r = True)
+            polyCount.append(cmds.polyEvaluate(t = True))
+
+        resultCount = sum(polyCount)
+
+        print (resultCount)
+        
 #-----------------------------------------------------------------------------------
 # ジョイント	
 #-----------------------------------------------------------------------------------  
