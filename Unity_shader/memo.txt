@@ -1,4 +1,0 @@
-UnityDeferredLibrary.cginc
-att = sqrt(att)/2/2;	// add for ue4 attenuation
-attenuation
-v = 1.0f / (1.0f + 25.0f * Mathf.Pow(Mathf.Sqrt(v),0.8f)*8);
