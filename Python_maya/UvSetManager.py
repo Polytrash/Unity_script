@@ -1,6 +1,6 @@
 ﻿# -*- coding: utf-8 -*-
 
-#2017/1/15最終更新
+#2017/1/23最終更新
 
 import maya.cmds as cmds
 import maya.mel as mel
@@ -12,10 +12,10 @@ class UVSetManager(object):
     def __init__(self):
         self.window = 'UVSetManagerWindow'
         self.title = 'UV Set Manager'
-        self.size = (250, 350)
+        self.size = (250, 200)
 
         self.width = 250
-        self.height = 350  
+        self.height = 200  
                           
         self.transforms = [] 
         self.selectItem = ''
@@ -33,13 +33,17 @@ class UVSetManager(object):
 
         self.meshBtn = cmds.button( l = u"メッシュ取得", command = self.getAllGeom, height = 30 )     
         cmds.text(u"■ Mesh", bgc = (0.1, 0.2, 0.2), align = 'left', width = self.width)        
-        self.objScllist = cmds.textScrollList('objL', ams = True, sc = self.getAllUVSets)
+        self.objScllist = cmds.textScrollList('objL', height = 50, ams = True, sc = self.getAllUVSets)
         
         cmds.separator (h = 10, w = self.width, style = 'in')    
              
         cmds.text(u"■ UV : [ダブルクリック : UVEditor起動]\n            [Delete / BackSpace : UVSet削除]", bgc = (0.2, 0.1, 0.2), align = 'left', width = self.width)
-
-        self.uvScllist = cmds.textScrollList('uvL', ams = True, sc = self.getUVName, dkc = self.deleteUVSet, dcc = self.openTextureWindow)           
+        cmds.rowColumnLayout(nc = 3)
+        cmds.text(label='UVSet 名 : ')       
+        self.uvNameFld = cmds.textField( 'uvNameF', ec = self.uvNameChange)         
+        self.renameBtn = cmds.button( l = u"リネーム", command = self.uvNameChange )  
+        cmds.setParent('..')    
+        self.uvScllist = cmds.textScrollList('uvL', height = 50, ams = True, sc = self.getUVName, dkc = self.deleteUVSet, dcc = self.openTextureWindow)           
         c = cmds.columnLayout(adjustableColumn=True)
 
 
@@ -47,11 +51,7 @@ class UVSetManager(object):
                      
         self.renameBtn = cmds.button( l = u"選択 UVSet をコピーして新規作成", command = self.doGetCopyUVName )      
         cmds.formLayout(nch = True)             
-        cmds.rowColumnLayout(nc = 3)
-        cmds.text(label='UVSet 名 : ')       
-        self.uvNameFld = cmds.textField( 'uvNameF', )         
-        self.renameBtn = cmds.button( l = u"リネーム", command = self.uvNameChange )  
-        cmds.setParent('..')     
+ 
         cmds.setParent('..')              
  
         cmds.setParent('..')               
