@@ -1,6 +1,6 @@
 ﻿# -*- coding: utf-8 -*-
 
-#2017/1/23最終更新
+#2017/1/15最終更新
 
 import maya.cmds as cmds
 import maya.mel as mel
@@ -21,7 +21,7 @@ class CharaChecker(object):
         self.width = 600
         self.height = 350  
 
-        self.okc =(0.1, 0.6, 0.1)
+        self.okc =(0.1, 0.6, 0.2)
         self.ngc =(0.6, 0.1, 0.1)
         self.ggc =(0.2, 0.1, 0.1)
                         
@@ -224,11 +224,12 @@ class CharaChecker(object):
 #------------------------------#
 # リスト関連
 #------------------------------#
-    # 2つのリストの重複要素を削除して新規リスト作成    
-    def diffList(self, list1, list2, *args):        
-        diff = []
-        diff = set(list1) - set(list2)        
-        return diff
+
+    # 2つのリストの重複要素を削除して新規リスト作成
+    def makeUniqList(self, list1, list2, *args):
+        uniq = []
+        uniq = list(set(list1)^set(list2))
+        return uniq
         
     # リスト内の重複要素の削除
     def diffRemoveList(self, list, *args):
@@ -255,6 +256,11 @@ class CharaChecker(object):
         r = re.compile(sub)
         replacedName = name.replace(sub, '')
         return replacedName  
+
+    # 末尾削除        
+    def nameDel(self, word, val, *args):
+        d = word[:val]
+        return d                                
         
 #------------------------------#
 # チェックボックス色替え
@@ -400,12 +406,16 @@ class CharaChecker(object):
         reLJoints = []
         reRJoints = []
         
-        dupliList = []            
+        dupliList = []
+        
+        l = '_l'
+        r = '_r'            
                 
-        for a in self.joints:        
-            if '_l' in str(a):
+        for a in self.joints:   
+            last = (a[-2:])  
+            if last == l:
                 lJoints.append(str(a))                
-            elif '_r' in str(a):
+            elif last == r:
                 rJoints.append(str(a)) 
                                    
         if len(lJoints) == len(rJoints):
@@ -414,11 +424,11 @@ class CharaChecker(object):
             self.checkBoxColor('jointChckBox1', 0)             
         else:
             for b in lJoints:
-                reLJoints.append(self.nameReplace(b, '_l'))
-            for c in rJoints:                
-                reRJoints.append(self.nameReplace(c, '_r'))            
-            dupliList = self.diffList(reLJoints, reRJoints)                                               
-            
+                reLJoints.append(b[:-2])
+            for c in rJoints:          
+                reRJoints.append(c[:-2])  
+                   
+            dupliList = self.makeUniqList(reLJoints, reRJoints)
             print (u"■ ジョイント - 1 [NG]: 次の ジョイント の _l と _r が同数になっていません") 
             self.checkBoxColor('jointChckBox1', 1)             
             for d in dupliList:
