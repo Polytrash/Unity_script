@@ -9,6 +9,7 @@ import pymel.core as pm
 import re
 import string
 import math
+import itertools
 from collections import Counter
 
 class CharaChecker(object):
@@ -27,7 +28,7 @@ class CharaChecker(object):
                         
         # チェック対象
         self.objs = []    
-        self.transforms = []
+        self.meshes = []
         self.joints = []
         self.uvs = []
                 
@@ -44,13 +45,15 @@ class CharaChecker(object):
         self.window = cmds.window(self.window, title = self.title, widthHeight = self.size)
         self.nameFrm = cmds.frameLayout(label = u"キャラクターチェック項目", bgc = (0.15, 0.15, 0.15))        
         self.nameFrm = cmds.frameLayout(label = u"■ 命名規則", bgc = (0.1, 0.2, 0.4), cll = True)
-        cmds.checkBox('nameChckBox1', l = u"1. 名前 に 不要 な 文字 が 含まれていないか", bgc = (0.2, 0.2, 0.2), v = True)    
+        cmds.checkBox('nameChckBox1', l = u"1. 名前 に 半角英数以外 が 含まれていないか", bgc = (0.2, 0.2, 0.2), v = True)    
         cmds.checkBox('nameChckBox2', l = u"2. root 以下の ノード が 全て ユニーク名 になっているか", bgc = (0.2, 0.2, 0.2), v = True)    
+        cmds.checkBox('nameChckBox3', l = u"3. 名前の 末尾 が 大文字 になっていないか", bgc = (0.2, 0.2, 0.2), v = True)    
         cmds.setParent('..')  
           
         self.modelFrm = cmds.frameLayout(label = u"■ モデル", bgc = (0.4, 0.1, 0.4), cll = True)
         cmds.checkBox('modelChckBox1', l = u"1. ポリゴン数は ～8000 tris 以下か", bgc = (0.2, 0.2, 0.2), v = True)           
         cmds.checkBox('modelChckBox2', l = u"2. UVSet は 1 つだけで、UVSet 名は map1 になっているか", bgc = (0.2, 0.2, 0.2), v = True)          
+        cmds.checkBox('modelChckBox3', l = u"3. モデルに頂点カラーが含まれていないか", bgc = (0.2, 0.2, 0.2), v = True)          
         cmds.setParent('..')        
             
         self.jntFrm = cmds.frameLayout(label = u"■ ジョイント", bgc = (0.4, 0.4, 0.0), cll = True)      
@@ -82,7 +85,7 @@ class CharaChecker(object):
         key = ''
         self.objs = []  
         self.rootObjs = []  
-        self.transforms = [] 
+        self.mesheses = [] 
         self.joints = []        
         self.selectItem = ''
         self.uvs = []
@@ -94,11 +97,13 @@ class CharaChecker(object):
         # ■ 命名規則チェック                
         n1 = cmds.checkBox('nameChckBox1', q=True, value=True) 
         n2 = cmds.checkBox('nameChckBox2', q=True, value=True) 
-        
+        n3 = cmds.checkBox('nameChckBox3', q=True, value=True) 
+                
         # ■ モデルチェック         
         m1 = cmds.checkBox('modelChckBox1', q=True, value=True)        
         m2 = cmds.checkBox('modelChckBox2', q=True, value=True)
-
+        m3 = cmds.checkBox('modelChckBox3', q=True, value=True)
+        
         # ■ ジョイントチェック         
         j1 = cmds.checkBox('jointChckBox1', q=True, value=True) 
         j2 = cmds.checkBox('jointChckBox2', q=True, value=True) 
@@ -109,8 +114,7 @@ class CharaChecker(object):
 #------------------------------#          
         self.getAllNames(key)
         self.getAllNameUnderRoot(key)
-        self.getAllGeoms(key)
-        self.getAllJoints(key)
+        self.getAllMeshes(key)
         
 #------------------------------#        
 # チェック実行  
@@ -135,7 +139,14 @@ class CharaChecker(object):
             print('-------------------------------------------------------')
         else:
             self.checkBoxColor('nameChckBox2', 2)  
-                      
+            
+        if n3:
+            print('-------------------------------------------------------')            
+            self.nameUpperCheck(key)
+            print('-------------------------------------------------------')
+        else:
+            self.checkBoxColor('nameChckBox3', 3) 
+                                   
         # モデル
             
         if m1:
@@ -152,6 +163,12 @@ class CharaChecker(object):
         else:
             self.checkBoxColor('modelChckBox2', 2) 
             
+        if m3:
+            print('-------------------------------------------------------')            
+            self.vtxColorCheck(key)
+            print('-------------------------------------------------------')    
+        else:
+            self.checkBoxColor('modelChckBox3', 2)             
         # ジョイント
             
         if j1:
@@ -175,7 +192,7 @@ class CharaChecker(object):
         else:
             self.checkBoxColor('jointChckBox3', 2)                                                             
                         
-            
+                   
 #-----------------------------------------------------------------------------------
 # 汎用メソッド	
 #----------------------------------------------------------------------------------- 
@@ -191,20 +208,41 @@ class CharaChecker(object):
 #------------------------------#
 # root以下の全オブジェクト名取得
 #------------------------------#
+    def getAllNameUnderRoot(self, key, *args): 
+        root = []
+        child = []
+        jnt = []
+        mesh = []
 
-    def getAllNameUnderRoot(self, key, *args):
-        cmds.select('root', r = True)
-        self.rootObjs = cmds.listRelatives(ad = True)
+        root = cmds.ls(assemblies = True)
 
+        for a in root:
+            if cmds.objectType(a) == 'transform':
+                child.append(cmds.listRelatives(a, ad = True, type = 'transform'))                      
+                jnt.append(cmds.listRelatives(a, ad = True, type = 'joint')) 
+                
+        jnt = list(itertools.chain(*filter(None, jnt)))                
+        child = list(itertools.chain(*filter(None, child))) 
+        
+        root.extend(child)
+        self.objs = list(root)
+        self.joints = jnt
+
+        print ('-------------------------------------------------------')                             
+        print ('All transforms : ' + str(self.objs))
+        print ('All joints : ' + str(self.joints))
+
+        
 #------------------------------#
 # メッシュ名取得
 #------------------------------#
 
-    def getAllGeoms(self, key, *args):           
-        self.transforms = cmds.ls(typ = "mesh")            
-
+    def getAllMeshes(self, key, *args):           
+        self.meshes = cmds.ls(sn = True, typ = "mesh")            
+        print ('All meshes : ' + str(self.meshes))
+        
 #------------------------------#
-# ジョイント名取得
+# ジョイント名取得(*不使用)
 #------------------------------#
 
     def getAllJoints(self, key, *args):
@@ -241,8 +279,12 @@ class CharaChecker(object):
 
     # リスト内の重複要素の割り出し    
     def diffSrchList(self, list, *args):
-        c = Counter(list)
-        return [i for i in c if c[i]>1]
+        x=set(list)
+        dup=[]
+        for c in x:
+            if(list.count(c)>1):
+                dup.append(c)
+        return dup
 
     # リスト内を第二引数で指定した数の要素数のサブリストに分ける    
     def makeSubList(self,list, size, *args):
@@ -261,6 +303,25 @@ class CharaChecker(object):
     def nameDel(self, word, val, *args):
         d = word[:val]
         return d                                
+
+    # 指定文字で文字列を分割
+    def nameSplit(self, word , val , *args):
+        d = ''
+        d = word.split(val)
+        return d
+                
+    # 文字列が小文字かどうか
+    def nameLowerCheck(self, str, *args):
+        for char in str:
+            if 'A' <= char <= 'Z':
+                return False
+        return True 
+               
+    # ネストされたリストをリストに変換        
+    def flattenList(self, listOfLists, *args):
+        "Flatten one level of nesting"
+        return chain.from_iterable(listOfLists)
+                 
         
 #------------------------------#
 # チェックボックス色替え
@@ -300,10 +361,10 @@ class CharaChecker(object):
                 print(str(a) + u" に半角英数でない文字が存在しています")
                                
         if checked :
-            print(u"■ 命名規則 - 1 [OK]: オブジェクト名はすべて半角英数です")            
+            print(u"■ 命名規則 - 1 [OK]: 名前はすべて半角英数です")            
             self.checkBoxColor('nameChckBox1', 0)
         else :           
-            print(u"■ 命名規則 - 1 [NG]: オブジェクト名に半角英数でない文字が存在しています")            
+            print(u"■ 命名規則 - 1 [NG]: 名前に半角英数でない文字が存在しています")            
             self.checkBoxColor('nameChckBox1', 1)
                        
 #------------------------------#
@@ -313,10 +374,10 @@ class CharaChecker(object):
     def nameUniqCheck(self, key, *args):    
 
         checked = False        
-        diff = self.diffSrchList(self.rootObjs)
+        diff = self.diffSrchList(self.objs)
 
         if len(diff) == 0:     
-            print(u"■ 命名規則 - 2 [OK]: オブジェクト名はすべてユニーク名でした")
+            print(u"■ 命名規則 - 2 [OK]: 名前はすべてユニーク名でした")
             checked = True
             self.checkBoxColor('nameChckBox2', 0)           
         else :
@@ -324,11 +385,43 @@ class CharaChecker(object):
             for a in diff:
                 print(str(a))
             self.checkBoxColor('nameChckBox2', 1) 
+
+#------------------------------#
+# 2. 名前 末尾大文字チェック
+#------------------------------#
+    def nameUpperCheck(self, key, *args):
+
+        checked = False  
+        count = []
+        
+        i = 0      
+        last = ''        
+
+        for a in self.objs:
+            last = a[-1:]
+            # 末尾が小文字かチェック
+            if not self.nameLowerCheck(last): 
+                # 末尾が数値かチェック
+                if re.findall("\D+", last):
+                    count.append(i)            
+            else:
+                None
+            i += 1
+
+        if not count:
+            print (u"■ 命名規則 - 3 [OK]: 名前の末尾は小文字か数字になっています")
+            self.checkBoxColor('nameChckBox3', 0)             
+            checked = True                        
+        else:
+            print (u"■ 命名規則 - 3 [NG]: 次の名前がの末尾が大文字になっています")
+            self.checkBoxColor('nameChckBox3', 1)             
+            for b in count:
+                print(self.objs[b])                                                      
+                        
                                                          
 #-----------------------------------------------------------------------------------
 # モデル	
 #----------------------------------------------------------------------------------- 
-
 #------------------------------#
 # 1. ポリゴンカウントチェック
 #------------------------------#
@@ -339,7 +432,7 @@ class CharaChecker(object):
         polyCount =  []
         resultCount = 0       
         
-        for a in self.transforms:
+        for a in self.meshes:
             #print (a)
             cmds.select(a, r = True)
             polyCount.append(cmds.polyEvaluate(t = True))
@@ -367,7 +460,7 @@ class CharaChecker(object):
         indexNG = [] 
         uvCorrectCount = []
     
-        for a in self.transforms :    
+        for a in self.meshes :    
             self.uvs = cmds.polyUVSet (a, query = True , allUVSets = True)
             if len(self.uvs) > 1 :
                 print (u"■ モデル - 2 [NG]: " + str(a) + u" に UVSet が " + str(unicode(len(self.uvs))) + u" 存在しています") 
@@ -388,9 +481,65 @@ class CharaChecker(object):
             print (u"■ モデル - 2 [NG]: 次のメッシュ の UVSet の名前が map1 ではありません")
             indexNG = self.diffRemoveList(indexNG)            
             for i in indexNG:
-                print(self.transforms[i])                                   
-            self.checkBoxColor('modelChckBox2', 1)    
-                                                  
+                print(self.meshes[i])                                   
+            self.checkBoxColor('modelChckBox2', 1)  
+            
+#------------------------------#
+# 3.頂点カラーチェック
+#------------------------------#              
+
+    def vtxColorCheck(self, key, *args):
+        
+        checked = False 
+        vtxCol = False   
+             
+        verts = [] 
+        vtxCount = ''
+        vertsName = '' 
+
+        tmpRGB = []
+                
+        i = 0    
+        errCountA = 0  
+        errCountB = 0  
+                                                   
+        for a in self.objs:    
+            try:
+                cmds.select(a, r = True)
+                vtxCount = cmds.polyEvaluate( v = True )                  
+                # polyColorPerVertex は 親子関係 になっていると正しく取得できないので注意。                       
+                errCountA = 0
+                while(i < vtxCount):                                                         
+                    tmpRGB = cmds.polyColorPerVertex(str(a) + '.vtx[' + str(i) + ']', query = True, rgb = True) 
+                                                 
+                    for b in tmpRGB:
+                        c = int(round(b))
+                        if not c :
+                            None                         
+                        else:
+                            errCountA += 1                            
+                    i += 1                                                                                 
+                     
+            except ValueError:
+                pass
+            except RuntimeError:
+                pass
+                
+            if errCountA:  
+                print(u"■ モデル - 3 [NG]: 次のメッシュ に 頂点カラー が含まれています")
+                self.checkBoxColor('modelChckBox3', 1)                
+                print(a)
+                checked = False
+                errCountB += 1                          
+            else:  
+                checked = True                                                             
+            i = 0
+            
+        if checked :
+            if errCountB == 0:
+                print(u"■ モデル - 3 [OK]: メッシュに頂点カラーは含まれていません") 
+                self.checkBoxColor('modelChckBox3', 0)                         
+                            
 #-----------------------------------------------------------------------------------
 # ジョイント	
 #-----------------------------------------------------------------------------------
