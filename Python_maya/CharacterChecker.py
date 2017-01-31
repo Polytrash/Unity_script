@@ -2,15 +2,15 @@
 
 #2017/1/15最終更新
 
-import maya.cmds as cmds
-import maya.mel as mel
-import pymel.core as pm
-
 import re
 import string
 import math
 import itertools
 from collections import Counter
+
+import maya.cmds as cmds
+import maya.mel as mel
+import pymel.core as pm
 
 class CharaChecker(object):
     
@@ -35,6 +35,9 @@ class CharaChecker(object):
         # 選択対象        
         self.selectItem = ''
         self.uvName = ''
+        
+        self.result = u""
+
 
 
                      
@@ -43,7 +46,7 @@ class CharaChecker(object):
             cmds.deleteUI('CharaCheckerWindow')
             
         self.window = cmds.window(self.window, title = self.title, widthHeight = self.size)
-        self.nameFrm = cmds.frameLayout(label = u"キャラクターチェック項目", bgc = (0.15, 0.15, 0.15))        
+        self.nameFrm = cmds.frameLayout(label = u"【キャラクターチェック項目】", bgc = (0.15, 0.15, 0.15))        
         self.nameFrm = cmds.frameLayout(label = u"■ 命名規則", bgc = (0.1, 0.2, 0.4), cll = True)
         cmds.checkBox('nameChckBox1', l = u"1. 名前 に 半角英数以外 が 含まれていないか", bgc = (0.2, 0.2, 0.2), v = True)    
         cmds.checkBox('nameChckBox2', l = u"2. root 以下の ノード が 全て ユニーク名 になっているか", bgc = (0.2, 0.2, 0.2), v = True)    
@@ -57,7 +60,7 @@ class CharaChecker(object):
         cmds.setParent('..')        
             
         self.jntFrm = cmds.frameLayout(label = u"■ ジョイント", bgc = (0.4, 0.4, 0.0), cll = True)      
-        cmds.checkBox('jointChckBox1', l = u"1. _l  に対して同数の _r  が存在しているか", bgc = (0.2, 0.2, 0.2), v = True)
+        cmds.checkBox('jointChckBox1', l = u"1. ジョイント名の _l  に対して同数の _r  が存在しているか", bgc = (0.2, 0.2, 0.2), v = True)
         cmds.checkBox('jointChckBox2', l = u"2. Joint Orient が全て 0 になっているか", bgc = (0.2, 0.2, 0.2), v = True)   
         cmds.checkBox('jointChckBox3', l = u"3. 移動値・回転値 に リミット が指定されていないか", bgc = (0.2, 0.2, 0.2), v = True)
         cmds.checkBox('jointChckBox4', l = u"4. mant , tail , hair 関連の ジョイント は X軸 が 子方向 に 向いているか", bgc = (0.2, 0.2, 0.2), v = True)
@@ -66,16 +69,24 @@ class CharaChecker(object):
         self.renameBtn = cmds.button( l = u"チェック実行" ,command = self.doCheck )   
         
         cmds.separator (h = 10, w = self.width, style = 'in') 
-                
-        cmds.text(u"チェック結果", bgc = (0.1, 0.1, 0.1), align = 'left', width = self.width)     
-        cmds.scrollField('resultField', wordWrap = True, text = 'blank', editable = False )                                            
-
+        self.nameFrm = cmds.frameLayout(label = u"【キャラクターチェック結果】", bgc = (0.15, 0.15, 0.15))                     
+   
+        cmds.scrollField('resultField', wordWrap = True, text = self.result, editable = False )
+                                                    
+        cmds.rowColumnLayout(nc = 3)
+        cmds.text(label='オブジェクト名 : ')       
+        self.uvNameFld = cmds.textField( 'nameF',w = 200, ec = self.srchName)         
+        self.renameBtn = cmds.button( l = u"検索", w = 100 , command = self.srchName )  
+        cmds.setParent('..') 
+           
+        cmds.text(u"【問い合わせ先：】", bgc = (0.1, 0.1, 0.1), align = 'left', width = self.width)  
+     
         cmds.setParent('..')              
         cmds.setParent('..')                 
         cmds.setParent('..')  
   
         cmds.showWindow() 
-        
+
 #-----------------------------------------------------------------------------------
 # UIメソッド	
 #----------------------------------------------------------------------------------- 
@@ -90,6 +101,8 @@ class CharaChecker(object):
         self.selectItem = ''
         self.uvs = []
         self.uvName = ''
+        
+        self.result = u""
         
 #------------------------------#        
 # チェックリスト   
@@ -192,11 +205,18 @@ class CharaChecker(object):
         else:
             self.checkBoxColor('jointChckBox3', 2)                                                             
                         
-                   
+        self.outputResult('resultField', 'result')
+                           
 #-----------------------------------------------------------------------------------
 # 汎用メソッド	
 #----------------------------------------------------------------------------------- 
-
+#------------------------------#
+# オブジェクト名検索
+#------------------------------#
+    def srchName(self, *args):
+        name = ''
+        name = cmds.textField('nameF', query =True, text = True)  
+        cmds.select(str(name))
 #------------------------------#
 # 全オブジェクト名取得
 #------------------------------#
@@ -333,7 +353,21 @@ class CharaChecker(object):
             cmds.checkBox(chckBox, e = True, bgc = self.ngc)
         else:
             cmds.checkBox(chckBox, e = True, bgc = self.ggc)                            
-                            
+
+#------------------------------#
+# 結果テキスト格納
+#------------------------------# 
+    def storeResult(self, sentence, *args):   
+   
+        self.result += (sentence + '\n')                    
+
+#------------------------------#
+# 結果テキスト出力
+#------------------------------#                             
+    def outputResult(self, sF, result, *args):  
+             
+        cmds.scrollField(sF, e = True, text = self.result)         
+
 #-----------------------------------------------------------------------------------          
 #-----------------------------------------------------------------------------------
 # チェックリスト
@@ -361,10 +395,14 @@ class CharaChecker(object):
                 print(str(a) + u" に半角英数でない文字が存在しています")
                                
         if checked :
-            print(u"■ 命名規則 - 1 [OK]: 名前はすべて半角英数です")            
+            print(u"■ 命名規則 - 1 [OK]: 名前はすべて半角英数です") 
+            self.storeResult(u"■ 命名規則 - 1 [OK]: 名前はすべて半角英数です")   
+                    
             self.checkBoxColor('nameChckBox1', 0)
         else :           
-            print(u"■ 命名規則 - 1 [NG]: 名前に半角英数でない文字が存在しています")            
+            print(u"■ 命名規則 - 1 [NG]: 名前に半角英数でない文字が存在しています")
+            self.storeResult(u"■ 命名規則 - 1 [NG]: 名前に半角英数でない文字が存在しています")                         
+            
             self.checkBoxColor('nameChckBox1', 1)
                        
 #------------------------------#
@@ -377,13 +415,16 @@ class CharaChecker(object):
         diff = self.diffSrchList(self.objs)
 
         if len(diff) == 0:     
-            print(u"■ 命名規則 - 2 [OK]: 名前はすべてユニーク名でした")
+            print(u"■ 命名規則 - 2 [OK]: 名前はすべてユニーク名でした") 
+            self.storeResult(u"■ 命名規則 - 2 [OK]: 名前はすべてユニーク名でした")                                  
             checked = True
             self.checkBoxColor('nameChckBox2', 0)           
         else :
-            print(u"■ 命名規則 - 2 [NG]: 次の名前が重複しています")            
+            print(u"■ 命名規則 - 2 [NG]: 次の名前が重複しています") 
+            self.storeResult(u"■ 命名規則 - 2 [NG]: 次の名前が重複しています")                       
             for a in diff:
                 print(str(a))
+                self.storeResult(str(a))
             self.checkBoxColor('nameChckBox2', 1) 
 
 #------------------------------#
@@ -410,12 +451,15 @@ class CharaChecker(object):
 
         if not count:
             print (u"■ 命名規則 - 3 [OK]: 名前の末尾は小文字か数字になっています")
+            self.storeResult(u"■ 命名規則 - 3 [OK]: 名前の末尾は小文字か数字になっています")               
             self.checkBoxColor('nameChckBox3', 0)             
             checked = True                        
         else:
             print (u"■ 命名規則 - 3 [NG]: 次の名前がの末尾が大文字になっています")
+            self.storeResult(u"■ 命名規則 - 3 [NG]: 次の名前がの末尾が大文字になっています")               
             self.checkBoxColor('nameChckBox3', 1)             
             for b in count:
+                self.storeResult(self.objs[b])                
                 print(self.objs[b])                                                      
                         
                                                          
@@ -440,13 +484,17 @@ class CharaChecker(object):
         resultCount = sum(polyCount)
         
         if resultCount <= 8000 :
-            print (u"■ モデル - 1 [OK]: ポリゴン数は8000以下です")
+            print (u"■ モデル - 1 [OK]: ポリゴン数は 8000tris 以下です")
+            self.storeResult(u"■ モデル - 1 [OK]: ポリゴン数は8000tris 以下です")               
             print (str(resultCount) + ' tris')
+            self.storeResult(str(resultCount) + ' tris')               
             checked = True
             self.checkBoxColor('modelChckBox1', 0)            
         else :
-            print (u"■ モデル - 1 [NG]: ポリゴン数が8000をオーバーしています")
+            print (u"■ モデル - 1 [NG]: ポリゴン数が 8000tris をオーバーしています")
+            self.storeResult(u"■ モデル - 1 [NG]: ポリゴン数が 8000tris をオーバーしています")            
             print (str(resultCount) + ' tris')
+            self.storeResult(str(resultCount) + ' tris')              
             self.checkBoxColor('modelChckBox1', 1)
                
 #------------------------------#
@@ -475,12 +523,15 @@ class CharaChecker(object):
             
         if not indexNG:
             print (u"■ モデル - 2 [OK]: UVSet は　1 メッシュに対して 1 つで、名前はすべて map1 です")
+            self.storeResult(u"■ モデル - 2 [OK]: UVSet は　1 メッシュに対して 1 つで、名前はすべて map1 です")            
             checked = True
             self.checkBoxColor('modelChckBox2', 0) 
         else :
             print (u"■ モデル - 2 [NG]: 次のメッシュ の UVSet の名前が map1 ではありません")
+            self.storeResult(u"■ モデル - 2 [NG]: 次のメッシュ の UVSet の名前が map1 ではありません")             
             indexNG = self.diffRemoveList(indexNG)            
             for i in indexNG:
+                self.storeResult(self.meshes[i])                
                 print(self.meshes[i])                                   
             self.checkBoxColor('modelChckBox2', 1)  
             
@@ -501,7 +552,8 @@ class CharaChecker(object):
                 
         i = 0    
         errCountA = 0  
-        errCountB = 0  
+        errCountB = 0 
+        errMesh = [] 
                                                    
         for a in self.objs:    
             try:
@@ -525,10 +577,8 @@ class CharaChecker(object):
             except RuntimeError:
                 pass
                 
-            if errCountA:  
-                print(u"■ モデル - 3 [NG]: 次のメッシュ に 頂点カラー が含まれています")
-                self.checkBoxColor('modelChckBox3', 1)                
-                print(a)
+            if errCountA:                                            
+                errMesh.append(a)                 
                 checked = False
                 errCountB += 1                          
             else:  
@@ -538,8 +588,16 @@ class CharaChecker(object):
         if checked :
             if errCountB == 0:
                 print(u"■ モデル - 3 [OK]: メッシュに頂点カラーは含まれていません") 
-                self.checkBoxColor('modelChckBox3', 0)                         
-                            
+                self.storeResult(u"■ モデル - 3 [OK]: メッシュに頂点カラーは含まれていません")                 
+                self.checkBoxColor('modelChckBox3', 0)
+            else : 
+                print(u"■ モデル - 3 [NG]: 次のメッシュ に 頂点カラー が含まれています")
+                self.storeResult(u"■ モデル - 3 [NG]: 次のメッシュ に 頂点カラー が含まれています")                                                       
+                self.checkBoxColor('modelChckBox3', 1)
+                for a in errMesh:
+                    print(a)
+                    self.storeResult(a)  
+                                            
 #-----------------------------------------------------------------------------------
 # ジョイント	
 #-----------------------------------------------------------------------------------
@@ -568,7 +626,8 @@ class CharaChecker(object):
                 rJoints.append(str(a)) 
                                    
         if len(lJoints) == len(rJoints):
-            print (u"■ ジョイント - 1 [OK]: _l に対する _r は同数です")
+            print (u"■ ジョイント - 1 [OK]: ジョイント名の _l に対する _r は同数です")
+            self.storeResult(u"■ ジョイント - 1 [OK]: ジョイント名の _l に対する _r は同数です")               
             checked = True
             self.checkBoxColor('jointChckBox1', 0)             
         else:
@@ -578,11 +637,13 @@ class CharaChecker(object):
                 reRJoints.append(c[:-2])  
                    
             dupliList = self.makeUniqList(reLJoints, reRJoints)
-            print (u"■ ジョイント - 1 [NG]: 次の ジョイント の _l と _r が同数になっていません") 
+            print (u"■ ジョイント - 1 [NG]: 次の ジョイント名 の _l と _r が同数になっていません")
+            self.storeResult(u"■ ジョイント - 1 [NG]: 次の ジョイント名 の _l と _r が同数になっていません")              
             self.checkBoxColor('jointChckBox1', 1)             
             for d in dupliList:
                 print (d)                
-                     
+                self.storeResult(d)                      
+                
 #------------------------------#
 # 2. JointOrient チェック
 #------------------------------#          
@@ -614,15 +675,17 @@ class CharaChecker(object):
                                   
         if not indexNG:
             checked = True 
-            print (u"■ ジョイント - 2 [OK]: すべての ジョイント の JointOrient は 0 です") 
+            print (u"■ ジョイント - 2 [OK]: すべての ジョイント の JointOrient は 0 です")
+            self.storeResult(u"■ ジョイント - 2 [OK]: すべての ジョイント の JointOrient は 0 です")              
             self.checkBoxColor('jointChckBox2', 0)                                     
         else:                                                      
-            print (u"■ ジョイント - 2 [NG]: 次の ジョイント の JointOrient が 0 になっていません")  
+            print (u"■ ジョイント - 2 [NG]: 次の ジョイント の JointOrient が 0 になっていません")
+            self.storeResult(u"■ ジョイント - 2 [NG]: 次の ジョイント の JointOrient が 0 になっていません")               
             indexNG = self.diffRemoveList(indexNG)
             self.checkBoxColor('jointChckBox2', 1)         
             for i in indexNG:
                 print(self.joints[i])                     
-            
+                self.storeResult(self.joints[i])             
 #------------------------------#
 # 3. Transform Limit チェック
 #------------------------------#          
@@ -685,26 +748,35 @@ class CharaChecker(object):
 
         if not trnsIndexNG:
             trnsChecked = True 
-            print (u"■ ジョイント - 2 [OK]: すべての ジョイント の Translate の リミット は OFF です")                                     
+            print (u"■ ジョイント - 2 [OK]: すべての ジョイント の Translate の リミット は OFF です")
+            self.storeResult(u"■ ジョイント - 2 [OK]: すべての ジョイント の Translate の リミット は OFF です")                                                 
         else:                                                      
-            print (u"■ ジョイント - 2 [NG]: 次の ジョイント の Translate に リミット が指定されています")  
+            print (u"■ ジョイント - 2 [NG]: 次の ジョイント の Translate に リミット が指定されています") 
+            self.storeResult(u"■ ジョイント - 2 [NG]: 次の ジョイント の Translate に リミット が指定されています")              
             trnsIndexNG = self.diffRemoveList(trnsIndexNG)               
             for i in trnsIndexNG:
                 print(self.joints[i])    
-
+                self.storeResult(self.joints[i])
+                
         if not rotIndexNG:
             rotChecked = True 
-            print (u"■ ジョイント - 2 [OK]: すべての ジョイント の Rotate の リミット は OFF です")                          
+            print (u"■ ジョイント - 2 [OK]: すべての ジョイント の Rotate の リミット は OFF です")
+            self.storeResult(u"■ ジョイント - 2 [OK]: すべての ジョイント の Rotate の リミット は OFF です")                                       
         else:                                                      
-            print (u"■ ジョイント - 2 [NG]: 次の ジョイント の Rotate に リミット が指定されています")  
+            print (u"■ ジョイント - 2 [NG]: 次の ジョイント の Rotate に リミット が指定されています")
+            self.storeResult(u"■ ジョイント - 2 [NG]: 次の ジョイント の Rotate に リミット が指定されています")                
             rotIndexNG = self.diffRemoveList(rotIndexNG)
             for i in rotIndexNG:
                 print(self.joints[i]) 
-
+                self.storeResult(self.joints[i])
+                
         if trnsChecked and rotChecked:
             self.checkBoxColor('jointChckBox3', 0)                             
         else:
-            self.checkBoxColor('jointChckBox3', 1)       
+            self.checkBoxColor('jointChckBox3', 1)      
+            
+            
+ 
 #-----------------------------------------------------------------------------------                 
 charaChecker = CharaChecker()
 charaChecker.create()
