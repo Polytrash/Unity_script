@@ -121,7 +121,8 @@ class CharaChecker(object):
         j1 = cmds.checkBox('jointChckBox1', q=True, value=True) 
         j2 = cmds.checkBox('jointChckBox2', q=True, value=True) 
         j3 = cmds.checkBox('jointChckBox3', q=True, value=True) 
-                        
+        j4 = cmds.checkBox('jointChckBox4', q=True, value=True) 
+        
 #------------------------------#        
 # リスト取得  
 #------------------------------#          
@@ -204,6 +205,14 @@ class CharaChecker(object):
             print('-------------------------------------------------------') 
         else:
             self.checkBoxColor('jointChckBox3', 2)                                                             
+
+        if j4:
+            print('-------------------------------------------------------')            
+            self.jntsTwistCheck(key)
+            print('-------------------------------------------------------') 
+        else:
+            self.checkBoxColor('jointChckBox3', 2)
+
                         
         self.outputResult('resultField', 'result')
                            
@@ -231,43 +240,86 @@ class CharaChecker(object):
     def getAllNameUnderRoot(self, key, *args): 
         root = []
         child = []
-        jnt = []
+        
+        objs = [] # 文字列走査用に使用(unicode to string)
+        
+        jnt1 = [] # joint格納用に使用   
+        jnt2 = [] # 文字列走査用に使用(unicode to string)
+        jntTmp = [] 
+        
         mesh = []
+        
 
         root = cmds.ls(assemblies = True)
-
+        
+        # transform と joint を選別
         for a in root:
             if cmds.objectType(a) == 'transform':
-                child.append(cmds.listRelatives(a, ad = True, type = 'transform'))                      
-                jnt.append(cmds.listRelatives(a, ad = True, type = 'joint')) 
+                print ('transform : ' + a)
+                child.append(cmds.listRelatives(a, ad = True, type = 'transform'))                             
+            elif cmds.objectType(a) == 'joint':                                   
+                jnt1.append(cmds.listRelatives(a, ad = True, type = 'joint')) 
+                # root Joint は 追加されないので、一旦　jntTmp に格納し、後処理で リストに追加・削除
+                jntTmp.append(a)
+                print ('joint : ' + a)             
                 
-        jnt = list(itertools.chain(*filter(None, jnt)))                
+        jnt1 = list(itertools.chain(*filter(None, jnt1)))                
         child = list(itertools.chain(*filter(None, child))) 
-        
-        root.extend(child)
-        self.objs = list(root)
-        self.joints = jnt
+                                   
+        # self.objs を string に変換
+        for o in root: 
+            o = self.uniToStr(o)
+            objs.append(o)
+            
+        self.objs = list(objs)  
 
+        # self.joints を string に変換                   
+        for j in jnt1: 
+            j = self.uniToStr(j)
+            jnt2.append(j)
+                               
+        self.joints = list(jnt2) 
+       
+        # 選別で精査しきれなかった jntTmp を self.objs から削除、 self.joints に追加
+        for x in jntTmp:
+            print x
+            self.objs.remove(x)
+            self.joints.append(x)
+  
+       
         print ('-------------------------------------------------------')                             
         print ('All transforms : ' + str(self.objs))
         print ('All joints : ' + str(self.joints))
-
-        
+ 
 #------------------------------#
 # メッシュ名取得
 #------------------------------#
 
     def getAllMeshes(self, key, *args):           
-        self.meshes = cmds.ls(sn = True, typ = "mesh")            
+        
+        meshes = []
+        tmp = ''
+        
+        self.meshes = cmds.ls(sn = True, typ = "mesh") 
+        for a in self.meshes: 
+            a = self.uniToStr(a)
+            tmp = re.sub('Shape', '', a)
+            meshes.append(tmp)
+            
+                   
+        self.meshes = list(meshes)          
+                  
         print ('All meshes : ' + str(self.meshes))
         
 #------------------------------#
-# ジョイント名取得(*不使用)
+# Unicode to String
 #------------------------------#
 
-    def getAllJoints(self, key, *args):
-        self.joints =  cmds.ls(typ = "joint")  
-
+    def uniToStr(self, key, *args):
+        key = ''.join(unicode(key))
+        result = key.replace("[u'", "").replace("']", "").replace("/", "\\")
+        return str(result)
+        
 #------------------------------#
 # 数値関連
 #------------------------------#
@@ -278,7 +330,23 @@ class CharaChecker(object):
             return False
         else:                  
             return True
-               
+            
+#------------------------------#
+# ジョイント関連
+#------------------------------#            
+    # 与えられた joint から root joint を取得
+    def getHierarchyRootJoint(self, jnt ,*args):   
+        # Search through the rootJoint's top most joint parent node
+        rootJoint = jnt
+
+        while (True):
+            parent = cmds.listRelatives( rootJoint, parent=True, type='joint' )
+            if not parent:
+                break;
+            rootJoint = parent[0]
+
+        return rootJoint  
+                       
 #------------------------------#
 # リスト関連
 #------------------------------#
@@ -469,7 +537,6 @@ class CharaChecker(object):
 #------------------------------#
 # 1. ポリゴンカウントチェック
 #------------------------------#
-
     def polyCountCheck(self, key, *args):
         
         checked = False       
@@ -478,9 +545,13 @@ class CharaChecker(object):
         
         for a in self.meshes:
             #print (a)
-            cmds.select(a, r = True)
-            polyCount.append(cmds.polyEvaluate(t = True))
-
+            try:
+                cmds.select(a, r = True)
+                polyCount.append(cmds.polyEvaluate(t = True))
+            except ValueError:
+                print (str(a) + ' is not found so Remove from meshes list')  
+                self.meshes.remove(a)  
+                
         resultCount = sum(polyCount)
         
         if resultCount <= 8000 :
@@ -509,17 +580,21 @@ class CharaChecker(object):
         uvCorrectCount = []
     
         for a in self.meshes :    
-            self.uvs = cmds.polyUVSet (a, query = True , allUVSets = True)
-            if len(self.uvs) > 1 :
-                print (u"■ モデル - 2 [NG]: " + str(a) + u" に UVSet が " + str(unicode(len(self.uvs))) + u" 存在しています") 
-            else :                 
-                for b in self.uvs :
-                    if b != 'map1':                        
-                        checked = False
-                        indexNG.append(count)
-                    else :
-                        uvCorrectCount.append(1)
-            count += 1                        
+            try:
+                self.uvs = cmds.polyUVSet (a, query = True , allUVSets = True)
+                if len(self.uvs) > 1 :
+                    print (u"■ モデル - 2 [NG]: " + str(a) + u" に UVSet が " + str(unicode(len(self.uvs))) + u" 存在しています") 
+                else :                 
+                    for b in self.uvs :
+                        if b != 'map1':                        
+                            checked = False
+                            indexNG.append(count)
+                        else :
+                            uvCorrectCount.append(1)
+                count += 1                        
+            except ValueError:
+                print (str(a) + ' is not found so Remove from meshes list')  
+                self.meshes.remove(a)              
             
         if not indexNG:
             print (u"■ モデル - 2 [OK]: UVSet は　1 メッシュに対して 1 つで、名前はすべて map1 です")
@@ -555,48 +630,56 @@ class CharaChecker(object):
         errCountB = 0 
         errMesh = [] 
                                                    
-        for a in self.objs:    
+        for a in self.meshes:    
             try:
                 cmds.select(a, r = True)
-                vtxCount = cmds.polyEvaluate( v = True )                  
+                vtxCount = cmds.polyEvaluate( v = True )   
+                               
                 # polyColorPerVertex は 親子関係 になっていると正しく取得できないので注意。                       
                 errCountA = 0
                 while(i < vtxCount):                                                         
-                    tmpRGB = cmds.polyColorPerVertex(str(a) + '.vtx[' + str(i) + ']', query = True, rgb = True) 
-                                                 
+                    tmpRGB = cmds.polyColorPerVertex(str(a) + '.vtx[' + str(i) + ']', query = True, rgb = True)                        
                     for b in tmpRGB:
+
                         c = int(round(b))
-                        if not c :
+                        if not c :                       
                             None                         
-                        else:
+                        else:                        
                             errCountA += 1                            
                     i += 1                                                                                 
                      
             except ValueError:
                 pass
             except RuntimeError:
-                pass
-                
+                pass               
+                         
             if errCountA:                                            
                 errMesh.append(a)                 
                 checked = False
                 errCountB += 1                          
             else:  
-                checked = True                                                             
-            i = 0
+                checked = True                                                                           
             
+   
         if checked :
             if errCountB == 0:
                 print(u"■ モデル - 3 [OK]: メッシュに頂点カラーは含まれていません") 
                 self.storeResult(u"■ モデル - 3 [OK]: メッシュに頂点カラーは含まれていません")                 
                 self.checkBoxColor('modelChckBox3', 0)
-            else : 
+            else :
                 print(u"■ モデル - 3 [NG]: 次のメッシュ に 頂点カラー が含まれています")
                 self.storeResult(u"■ モデル - 3 [NG]: 次のメッシュ に 頂点カラー が含まれています")                                                       
                 self.checkBoxColor('modelChckBox3', 1)
                 for a in errMesh:
                     print(a)
-                    self.storeResult(a)  
+                    self.storeResult(a)               
+        else : 
+            print(u"■ モデル - 3 [NG]: 次のメッシュ に 頂点カラー が含まれています")
+            self.storeResult(u"■ モデル - 3 [NG]: 次のメッシュ に 頂点カラー が含まれています")                                                       
+            self.checkBoxColor('modelChckBox3', 1)
+            for a in errMesh:
+                print(a)
+                self.storeResult(a)  
                                             
 #-----------------------------------------------------------------------------------
 # ジョイント	
@@ -775,8 +858,89 @@ class CharaChecker(object):
         else:
             self.checkBoxColor('jointChckBox3', 1)      
             
+#------------------------------#
+# 4. X軸ねじれ チェック (※ 構造が枝分かれしない前提)
+#------------------------------#             
+    def jntsTwistCheck(self, key, *args):
+        
+        checked = True  
+        errCount = 0             
+        
+        rootJnt = []
+        hrchyJnt = []
+        errJnt = []
+
+        i = 0
+        j = 0
+        k = 0
+        l = 0
+        m = 0
+
+        for a in self.joints:
+            rootJnt.append(self.uniToStr(self.getHierarchyRootJoint(a)))
             
- 
+        rootJnt = self.diffRemoveList(rootJnt)   
+        
+        # root Joint 取得
+        for b in rootJnt: 
+            cmds.select(b)       
+            hrchyJnt.append(cmds.listRelatives(ad = True))        
+        cmds.select(cl = True)   
+        # root Joint と chilld Joint を hrchyJnt　にネストして階層ごとに格納 
+        for x in hrchyJnt:
+            hrchyJnt[i].append(rootJnt[i])
+            i += 1             
+               
+        rotateXVal = [[] for _ in xrange(len(rootJnt))] 
+        subXVal = []
+        errJnt = []
+                 
+        # hrchyJnt の　joint　から rotate X 値を取得                     
+        for c in hrchyJnt:
+            for jnt in c:
+                rotateXVal[j].append(cmds.getAttr(str(jnt) + '.rotateX' ))                   
+            j += 1
+            
+        # rotateXVal の 各ネスト内の 値同士の差を取得して subXVal に格納
+        for d in rotateXVal:
+            subXVal.append( [abs(j-i) for i,j in zip(d, d[1:])])
+            # root Joint は 値が入っていても 0.0 扱いとして最後に追加(また、ジョイント名をリストする際にインデックス指定を合わせる)
+            subXVal[k].append(float(0.0))
+            k += 1
+        
+        for e in subXVal:
+            for f in e:
+                if f != 0.0: 
+                    errJnt.append(hrchyJnt[l][m])
+                    errCount += 1
+                else:                                       
+                    pass
+                m += 1                    
+            l += 1 
+            m = 0                        
+                  
+        print ('rotateX : ' + str(rotateXVal ))
+        print ('substract rotateX : ' + str(subXVal ))
+
+        if errCount == 0:
+            print(u"■ ジョイント - 2 [OK]: mant/tail/hair が存在しない or すべての mant/tail/hair ジョイントの Rotate:X は 子供 の方向を向いています")
+            self.storeResult(u"■ ジョイント - 2 [OK]: mant/tail/hair が存在しない or すべての mant/tail/hair ジョイントの Rotate:X は子供 の方向を向いています")              
+            checked = True                                       
+        else:                                                      
+            print(u"■ ジョイント - 3 [NG]: 次の ジョイント の階層で Rotate:X がねじれています")     
+            self.storeResult(u"■ ジョイント - 3 [NG]: 次の ジョイント の階層で Rotate:X がねじれています")                      
+            for i in errJnt:
+                print i
+                self.storeResult(i)
+            checked = False                
+   
+        if checked:
+            self.checkBoxColor('jointChckBox4', 0)                             
+        else:
+            self.checkBoxColor('jointChckBox4', 1)     
+         
+        
+         
 #-----------------------------------------------------------------------------------                 
 charaChecker = CharaChecker()
 charaChecker.create()
