@@ -22,8 +22,8 @@ class CharaChecker(object):
         self.width = 600
         self.height = 350  
 
-        self.okc =(0.1, 0.6, 0.2)
-        self.ngc =(0.6, 0.1, 0.1)
+        self.okc =(0.3, 0.8, 0.1)
+        self.ngc =(0.9, 0.3, 0.1)
         self.ggc =(0.2, 0.1, 0.1)
                         
         # チェック対象
@@ -31,6 +31,7 @@ class CharaChecker(object):
         self.meshes = []
         self.joints = []
         self.uvs = []
+        self.splineJnts = []
                 
         # 選択対象        
         self.selectItem = ''
@@ -208,10 +209,10 @@ class CharaChecker(object):
 
         if j4:
             print('-------------------------------------------------------')            
-            self.jntsTwistCheck(key)
+            self.doJntTwistCheck(key)
             print('-------------------------------------------------------') 
         else:
-            self.checkBoxColor('jointChckBox3', 2)
+            self.checkBoxColor('jointChckBox4', 2)
 
                         
         self.outputResult('resultField', 'result')
@@ -224,8 +225,11 @@ class CharaChecker(object):
 #------------------------------#
     def srchName(self, *args):
         name = ''
-        name = cmds.textField('nameF', query =True, text = True)  
-        cmds.select(str(name))
+        name = cmds.textField('nameF', query =True, text = True) 
+        try: 
+            cmds.select(str(name))
+        except ValueError:
+            print (name + u" は存在しません")            
 #------------------------------#
 # 全オブジェクト名取得
 #------------------------------#
@@ -251,7 +255,7 @@ class CharaChecker(object):
         
 
         root = cmds.ls(assemblies = True)
-        
+        print root        
         # transform と joint を選別
         for a in root:
             if cmds.objectType(a) == 'transform':
@@ -262,7 +266,7 @@ class CharaChecker(object):
                 # root Joint は 追加されないので、一旦　jntTmp に格納し、後処理で リストに追加・削除
                 jntTmp.append(a)
                 print ('joint : ' + a)             
-                
+        print jnt1                
         jnt1 = list(itertools.chain(*filter(None, jnt1)))                
         child = list(itertools.chain(*filter(None, child))) 
                                    
@@ -289,7 +293,7 @@ class CharaChecker(object):
        
         print ('-------------------------------------------------------')                             
         print ('All transforms : ' + str(self.objs))
-        print ('All joints : ' + str(self.joints))
+        print ('All joints : ' + str(jnt1))
  
 #------------------------------#
 # メッシュ名取得
@@ -350,12 +354,25 @@ class CharaChecker(object):
 #------------------------------#
 # リスト関連
 #------------------------------#
-
+    # リスト内の文字列検索(正規表現)し、カウント数を返す
+    def findStrInList(self, word, list, *args):
+        count = 0        
+        for x in list:      
+            #print (word + ' : ' + x)
+            if re.findall(word, x):                
+                count += 1
+            else:
+                pass
+        #print count          
+        return count                
+                  
+        
     # 2つのリストの重複要素を削除して新規リスト作成
     def makeUniqList(self, list1, list2, *args):
         uniq = []
         uniq = list(set(list1)^set(list2))
         return uniq
+      
         
     # リスト内の重複要素の削除
     def diffRemoveList(self, list, *args):
@@ -373,6 +390,10 @@ class CharaChecker(object):
             if(list.count(c)>1):
                 dup.append(c)
         return dup
+
+    # ネストされたリストを1次元にする
+    def flattenList(self, list, *args):
+        return [e for inner_list in list for e in inner_list]
 
     # リスト内を第二引数で指定した数の要素数のサブリストに分ける    
     def makeSubList(self,list, size, *args):
@@ -405,10 +426,7 @@ class CharaChecker(object):
                 return False
         return True 
                
-    # ネストされたリストをリストに変換        
-    def flattenList(self, listOfLists, *args):
-        "Flatten one level of nesting"
-        return chain.from_iterable(listOfLists)
+
                  
         
 #------------------------------#
@@ -436,6 +454,8 @@ class CharaChecker(object):
              
         cmds.scrollField(sF, e = True, text = self.result)         
 
+    def outputSpan(self, *args):
+        self.storeResult('------------------------------------------------')
 #-----------------------------------------------------------------------------------          
 #-----------------------------------------------------------------------------------
 # チェックリスト
@@ -453,7 +473,7 @@ class CharaChecker(object):
     def nameCheck(self, key, *args):
         
         checked = False
-        
+                
         for a in self.objs:                    
             regexp = re.compile(r'^[0-9A-Za-z]+$')
             result = regexp.search("abcdefghijklmnopqrstuvwxyz0123456789")
@@ -461,7 +481,7 @@ class CharaChecker(object):
                 checked = True
             else :
                 print(str(a) + u" に半角英数でない文字が存在しています")
-                               
+                          
         if checked :
             print(u"■ 命名規則 - 1 [OK]: 名前はすべて半角英数です") 
             self.storeResult(u"■ 命名規則 - 1 [OK]: 名前はすべて半角英数です")   
@@ -481,6 +501,7 @@ class CharaChecker(object):
 
         checked = False        
         diff = self.diffSrchList(self.objs)
+        print diff
 
         if len(diff) == 0:     
             print(u"■ 命名規則 - 2 [OK]: 名前はすべてユニーク名でした") 
@@ -529,7 +550,8 @@ class CharaChecker(object):
             for b in count:
                 self.storeResult(self.objs[b])                
                 print(self.objs[b])                                                      
-                        
+
+        self.outputSpan()                        
                                                          
 #-----------------------------------------------------------------------------------
 # モデル	
@@ -680,7 +702,9 @@ class CharaChecker(object):
             for a in errMesh:
                 print(a)
                 self.storeResult(a)  
-                                            
+                
+        self.outputSpan()  
+                                                    
 #-----------------------------------------------------------------------------------
 # ジョイント	
 #-----------------------------------------------------------------------------------
@@ -749,9 +773,12 @@ class CharaChecker(object):
         
         for b in jntOrntSub:
             for c in b:
-                if not self.greaterThan(math.floor(c),0):       
-                    indexNG.append(count)
-                    checked = False
+                try:
+                    if not self.greaterThan(math.floor(c),0):       
+                        indexNG.append(count)
+                        checked = False
+                except TypeError:
+                    print ('TypeError')
                 else:
                     None
             count += 1  
@@ -831,11 +858,11 @@ class CharaChecker(object):
 
         if not trnsIndexNG:
             trnsChecked = True 
-            print (u"■ ジョイント - 2 [OK]: すべての ジョイント の Translate の リミット は OFF です")
-            self.storeResult(u"■ ジョイント - 2 [OK]: すべての ジョイント の Translate の リミット は OFF です")                                                 
+            print (u"■ ジョイント - 3 [OK]: すべての ジョイント の Translate の リミット は OFF です")
+            self.storeResult(u"■ ジョイント - 3 [OK]: すべての ジョイント の Translate の リミット は OFF です")                                                 
         else:                                                      
-            print (u"■ ジョイント - 2 [NG]: 次の ジョイント の Translate に リミット が指定されています") 
-            self.storeResult(u"■ ジョイント - 2 [NG]: 次の ジョイント の Translate に リミット が指定されています")              
+            print (u"■ ジョイント - 3 [NG]: 次の ジョイント の Translate に リミット が指定されています") 
+            self.storeResult(u"■ ジョイント - 3 [NG]: 次の ジョイント の Translate に リミット が指定されています")              
             trnsIndexNG = self.diffRemoveList(trnsIndexNG)               
             for i in trnsIndexNG:
                 print(self.joints[i])    
@@ -843,11 +870,11 @@ class CharaChecker(object):
                 
         if not rotIndexNG:
             rotChecked = True 
-            print (u"■ ジョイント - 2 [OK]: すべての ジョイント の Rotate の リミット は OFF です")
-            self.storeResult(u"■ ジョイント - 2 [OK]: すべての ジョイント の Rotate の リミット は OFF です")                                       
+            print (u"■ ジョイント - 3 [OK]: すべての ジョイント の Rotate の リミット は OFF です")
+            self.storeResult(u"■ ジョイント - 3 [OK]: すべての ジョイント の Rotate の リミット は OFF です")                                       
         else:                                                      
-            print (u"■ ジョイント - 2 [NG]: 次の ジョイント の Rotate に リミット が指定されています")
-            self.storeResult(u"■ ジョイント - 2 [NG]: 次の ジョイント の Rotate に リミット が指定されています")                
+            print (u"■ ジョイント - 3 [NG]: 次の ジョイント の Rotate に リミット が指定されています")
+            self.storeResult(u"■ ジョイント - 3 [NG]: 次の ジョイント の Rotate に リミット が指定されています")                
             rotIndexNG = self.diffRemoveList(rotIndexNG)
             for i in rotIndexNG:
                 print(self.joints[i]) 
@@ -857,24 +884,18 @@ class CharaChecker(object):
             self.checkBoxColor('jointChckBox3', 0)                             
         else:
             self.checkBoxColor('jointChckBox3', 1)      
-            
 #------------------------------#
-# 4. X軸ねじれ チェック (※ 構造が枝分かれしない前提)
-#------------------------------#             
-    def jntsTwistCheck(self, key, *args):
+# 4A. X軸ねじれ チェック (mant,tail,hair の有無チェック)
+#------------------------------# 
+    def doJntTwistCheck(self, key, *args):
         
-        checked = True  
-        errCount = 0             
-        
+        checked = False          
         rootJnt = []
         hrchyJnt = []
-        errJnt = []
+        
+        checkTarget = 0
 
         i = 0
-        j = 0
-        k = 0
-        l = 0
-        m = 0
 
         for a in self.joints:
             rootJnt.append(self.uniToStr(self.getHierarchyRootJoint(a)))
@@ -889,14 +910,87 @@ class CharaChecker(object):
         # root Joint と chilld Joint を hrchyJnt　にネストして階層ごとに格納 
         for x in hrchyJnt:
             hrchyJnt[i].append(rootJnt[i])
-            i += 1             
-               
-        rotateXVal = [[] for _ in xrange(len(rootJnt))] 
-        subXVal = []
+            i += 1  
+                
+        try:
+            for j in hrchyJnt:                               
+                checkTarget += self.findStrInList('mant', j)
+                checkTarget += self.findStrInList('tail', j)
+                checkTarget += self.findStrInList('hair', j)
+        except TypeError:
+            print  'TypeError : doJntTwistCheck'       
+        
+        if checkTarget != 0:
+            self.jntsTwistCheck(hrchyJnt, rootJnt)                    
+        else:
+            print(u"■ ジョイント - 4 [OK]: シーン内に mant/tail/hair は 存在しません")
+            self.storeResult(u"■ ジョイント - 4 [OK]: シーン内に mant/tail/hair は 存在しません")
+            checked = True                           
+        
+        if checked:            
+            self.checkBoxColor('jointChckBox4', 0)             
+            
+                        
+#------------------------------#
+# 4B. X軸ねじれ チェック (※ 構造が枝分かれしない前提)
+#------------------------------#             
+    def jntsTwistCheck(self, hrchyJnt, rootJnt, *args):
+        
+        checked = True  
+        errCount = 0   
+        
+        count = 0  
+        index = 0        
+                
+        diffJnt = []
+        sortedJnt = []
+        tmpJnt = ''
+        tmpJnts = []
+       
+        nestedJnts = []
+                       
         errJnt = []
+        subXVal = []
+        
+        h = 0
+        i = 0
+        j = 0
+        k = 0
+        l = 0
+        m = 0
+
+
+        # rootJnt を hrchyJnt から除去(rootJnt には 必ず Rotate が入る. これを hrchyJnt の Rotate と比較するとエラーが出る為)
+        diffJnt = self.makeUniqList(rootJnt, self.flattenList(hrchyJnt)) 
+
+        # unicode から string に変換し、昇順ソート              
+        for a in diffJnt:
+            sortedJnt.append(self.uniToStr(a))
+        sortedJnt = sorted(sortedJnt)   
+                
+        # 末端からの　pickWalk に都合が良いため　reversed で降順で回す
+        for b in reversed(sortedJnt):                             
+
+            cmds.select(b)
+            tmpJnt = self.uniToStr(cmds.pickWalk(d = 'up'))
+            cmds.select(cl = True)
+            
+            # pickWalk で rootJnt のジョイントに到達したら tmpJnts を一旦閉じて nestedJnts に格納し tmpJnts をクリア
+            if tmpJnt in rootJnt:
+                nestedJnts.append(self.diffRemoveList(sorted(tmpJnts)))                
+                tmpJnts = [] 
+            # 到達しなければ tmpJnts に tmpJnt を格納し続ける                             
+            else: 
+                tmpJnts.append(b)             
+                tmpJnts.append(tmpJnt)
+                
+        self.splineJnts = nestedJnts                                     
+
+        # 値の格納用に self.splineJnts と　同じ構造のネストされたリストを生成           
+        rotateXVal = [[] for _ in xrange(len(self.splineJnts))] 
                  
-        # hrchyJnt の　joint　から rotate X 値を取得                     
-        for c in hrchyJnt:
+        # self.splineJnts の　joint　から rotate X 値を取得                     
+        for c in self.splineJnts:
             for jnt in c:
                 rotateXVal[j].append(cmds.getAttr(str(jnt) + '.rotateX' ))                   
             j += 1
@@ -904,42 +998,49 @@ class CharaChecker(object):
         # rotateXVal の 各ネスト内の 値同士の差を取得して subXVal に格納
         for d in rotateXVal:
             subXVal.append( [abs(j-i) for i,j in zip(d, d[1:])])
-            # root Joint は 値が入っていても 0.0 扱いとして最後に追加(また、ジョイント名をリストする際にインデックス指定を合わせる)
+            # root Joint は 値が入っていても 0.0 扱いとして最後に追加(また、ジョイント名をリストする際にインデックス指定を合わせる目的もあり)
             subXVal[k].append(float(0.0))
             k += 1
         
         for e in subXVal:
             for f in e:
                 if f != 0.0: 
-                    errJnt.append(hrchyJnt[l][m])
+                    errJnt.append(self.splineJnts[l][m])
                     errCount += 1
                 else:                                       
                     pass
                 m += 1                    
             l += 1 
-            m = 0                        
-                  
-        print ('rotateX : ' + str(rotateXVal ))
-        print ('substract rotateX : ' + str(subXVal ))
+            m = 0   
 
         if errCount == 0:
-            print(u"■ ジョイント - 2 [OK]: mant/tail/hair が存在しない or すべての mant/tail/hair ジョイントの Rotate:X は 子供 の方向を向いています")
-            self.storeResult(u"■ ジョイント - 2 [OK]: mant/tail/hair が存在しない or すべての mant/tail/hair ジョイントの Rotate:X は子供 の方向を向いています")              
+            print(u"■ ジョイント - 4 [OK]: すべての mant/tail/hair ジョイントの Rotate:X は 子供 の方向を向いています")
+            self.storeResult(u"■ ジョイント - 2 [OK]: すべての mant/tail/hair ジョイントの Rotate:X は子供 の方向を向いています")              
             checked = True                                       
         else:                                                      
-            print(u"■ ジョイント - 3 [NG]: 次の ジョイント の階層で Rotate:X がねじれています")     
-            self.storeResult(u"■ ジョイント - 3 [NG]: 次の ジョイント の階層で Rotate:X がねじれています")                      
+            print(u"■ ジョイント - 4 [NG]: 次の ジョイント の階層の前後で  Rotate:X の値が異なっています")     
+            self.storeResult(u"■ ジョイント - 4 [NG]: 次の ジョイント の階層の前後で Rotate:X の値が異なっています")     
             for i in errJnt:
                 print i
                 self.storeResult(i)
-            checked = False                
-   
+            checked = False        
+                    
+        print('-------------------------------------------------------') 
+        print('------------------ Spline Joint Info ------------------') 
+        print('-------------------------------------------------------') 
+        print ('All spline joint hierarchy : ' + str(hrchyJnt))
+        print ('rootJoint : ' + str(rootJnt))                                       
+        print ('splineJoints : ' + str(self.splineJnts))               
+        print ('rotateX : ' + str(rotateXVal ))
+        print ('substract rotateX : ' + str(subXVal ))
+        print('-------------------------------------------------------')
+           
         if checked:
             self.checkBoxColor('jointChckBox4', 0)                             
         else:
             self.checkBoxColor('jointChckBox4', 1)     
          
-        
+        self.outputSpan()          
          
 #-----------------------------------------------------------------------------------                 
 charaChecker = CharaChecker()
