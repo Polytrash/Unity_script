@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-#2017/2/10ÅIXV
+#2017/2/10æœ€çµ‚æ›´æ–°
 
 import maya.cmds as cmds
 import maya.mel as mel
@@ -31,31 +31,43 @@ class ObjectScatter(object):
             cmds.deleteUI('ObjectScatterWindow')
             
         self.window = cmds.window(self.window, title = self.title, widthHeight = self.size)
-        self.frameFrm1 = cmds.frameLayout(label = u"ƒ^[ƒQƒbƒg•\–Ê ‚É ƒIƒuƒWƒFƒNƒg ‚ğ ƒ‰ƒ“ƒ_ƒ€ ‚É”z’u‚µ‚Ü‚·", bgc = (0.1, 0.2, 0.5))
+        self.frameFrm1 = cmds.frameLayout(label = u"ã‚¿ãƒ¼ã‚²ãƒƒãƒˆè¡¨é¢ ã« ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ ã‚’ ãƒ©ãƒ³ãƒ€ãƒ  ã«é…ç½®ã—ã¾ã™", bgc = (0.1, 0.2, 0.5))
     
-        cmds.text(u"¡ ƒ^[ƒQƒbƒg", bgc = (0.1, 0.5, 0.2), align = 'left', width = self.width)   
+        cmds.text(u"â–  ã‚¿ãƒ¼ã‚²ãƒƒãƒˆ", bgc = (0.1, 0.5, 0.2), align = 'left', width = self.width)   
         cmds.rowColumnLayout(nc = 3, rowSpacing=(10,10))             
-        cmds.text(label=u"‘I‘ğ‚µ‚ÄƒZƒbƒg : ")       
+        cmds.text(label=u"é¸æŠã—ã¦ã‚»ãƒƒãƒˆ : ")       
         self.trgtFld = cmds.textField( 'trgtNameF',text = '', width = 150)         
-        self.trgtSetBtn = cmds.button( l = u"ƒZƒbƒg", width = 60 , c = self.setTrgtName)  
+        self.trgtSetBtn = cmds.button( l = u"ã‚»ãƒƒãƒˆ", width = 60 , c = self.setTrgtName)  
         cmds.setParent('..')          
     
-        cmds.text(u"¡ ƒIƒuƒWƒFƒNƒg", bgc = (0.5, 0.1, 0.2), align = 'left', width = self.width)
+        cmds.text(u"â–  é…ç½®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ", bgc = (0.5, 0.1, 0.2), align = 'left', width = self.width)
         cmds.rowColumnLayout(nc = 3, rowSpacing=(10,10))        
-        cmds.text(label=u"‘I‘ğ‚µ‚ÄƒZƒbƒg : ")       
+        cmds.text(label=u"é¸æŠã—ã¦ã‚»ãƒƒãƒˆ : ")       
         self.srcFld = cmds.textField( 'srcNameF',text = '', width = 150)         
-        self.srcSetBtn = cmds.button( l = u"ƒZƒbƒg", width = 60 , c = self.setSrcName)   
-        cmds.setParent('..')          
-        cmds.columnLayout( columnAttach=('right', 5), rowSpacing=10, columnWidth=290 )
-        cmds.intSliderGrp('countSliderG', field = True,l = u"”z’u”F", minValue = 0, maxValue = 1000, fieldMinValue = 1, fieldMaxValue = 1000 )           
+        self.srcSetBtn = cmds.button( l = u"ã‚»ãƒƒãƒˆ", width = 60 , c = self.setSrcName)   
+        cmds.setParent('..')        
+        cmds.text(u"â–  è¨­å®š", bgc = (0.1, 0.2, 0.5), align = 'left', width = self.width)          
+        cmds.columnLayout( columnAttach=('right', 5), rowSpacing=10, columnWidth=290 )       
+         
+        cmds.intSliderGrp('countSliderG', field = True,l = u"é…ç½®æ•°ï¼š", minValue = 0, maxValue = 1000, fieldMinValue = 1, fieldMaxValue = 1000 )           
+
+        cmds.text(u"ãƒ» ä¿‚æ•°", bgc = (0.2, 0.2, 0.2), align = 'left', width = self.width) 
+        cmds.floatSliderGrp('radiusSliderG', field = True,l = u"è·é›¢ï¼š", value = 10, minValue = 0, maxValue = 100, fieldMinValue = 1, fieldMaxValue = 100 )                   
+        cmds.floatSliderGrp('widthSliderG', field = True,l = u"å¹…ï¼š", value = 100, minValue = 0, maxValue = 1000, fieldMinValue = 1, fieldMaxValue = 1000 )           
+        cmds.floatSliderGrp('heightSliderG', field = True,l = u"é«˜ã•ï¼š", value = 100,  minValue = 0, maxValue = 1000, fieldMinValue = 1, fieldMaxValue = 1000 )           
+        cmds.floatSliderGrp('depthSliderG', field = True,l = u"å¥¥è¡Œãï¼š", value = 100,  minValue = 0, maxValue = 1000, fieldMinValue = 1, fieldMaxValue = 1000 )                           
+
+        #cmds.text(u"ãƒ» ãƒ©ãƒ³ãƒ€ãƒ ", bgc = (0.2, 0.2, 0.2), align = 'left', width = self.width)
+        #cmds.checkBox('randomChck', l = u"â–  ãƒ©ãƒ³ãƒ€ãƒ å›è»¢",  v = True)  
+
         cmds.setParent('..') 
                      
-        self.renameBtn = cmds.button( l = u"”z’u", command = self.doPlacement )             
-        self.renameBtn = cmds.button( l = u"ƒŠƒZƒbƒg", command = self.resetPlacement )  
+        self.renameBtn = cmds.button( l = u"é…ç½®", command = self.doPlacement )             
+        self.renameBtn = cmds.button( l = u"ãƒªã‚»ãƒƒãƒˆ", command = self.resetPlacement )  
         cmds.showWindow()         
         
 #-----------------------------------------------------------------------------------
-# ”Ä—pƒƒ\ƒbƒh	
+# æ±ç”¨ãƒ¡ã‚½ãƒƒãƒ‰	
 #-----------------------------------------------------------------------------------
     def removeDigit(self, target, *args):
         result = ''.join([i for i in target if not i.isdigit()])
@@ -67,7 +79,7 @@ class ObjectScatter(object):
         return str(target)
 
 #-----------------------------------------------------------------------------------
-# w’èƒƒ\ƒbƒh	
+# æŒ‡å®šãƒ¡ã‚½ãƒƒãƒ‰	
 #-----------------------------------------------------------------------------------
     
     def setTrgtName(self, *args):    
@@ -98,7 +110,7 @@ class ObjectScatter(object):
         print("Source Shape Set : " + srcShapeName)            
 
 #-----------------------------------------------------------------------------------
-# ”z’uƒƒ\ƒbƒh	
+# é…ç½®ãƒ¡ã‚½ãƒƒãƒ‰	
 #-----------------------------------------------------------------------------------
 
         
@@ -127,29 +139,46 @@ class ObjectScatter(object):
         srcObj = ''  
         count = 0 
         
+        radius = 10
+        width = 1000
+        height = 1000
+        depth = 1000
+        
+        randVal = 1
+                        
         self.setLocator()     
         
-        trgtObj = cmds.textField('trgtNameF', query = True, text = True)
-        srcObj = cmds.textField('srcNameF', query = True, text = True)
+                
+        trgtShape = cmds.textField('trgtNameF', query = True, text = True)
+        srcShape = cmds.textField('srcNameF', query = True, text = True)
         count = cmds.intSliderGrp('countSliderG', query = True, value = True)
+        width = cmds.floatSliderGrp('radiusSliderG', query = True, value = True)
+        width = cmds.floatSliderGrp('widthSliderG', query = True, value = True)
+        height = cmds.floatSliderGrp('heightSliderG', query = True, value = True)
+        depth = cmds.floatSliderGrp('depthSliderG', query = True, value = True)  
+        #randChck = cmds.checkBox('randomChck', q=True, value=True)    
+        
+        trgtName = re.sub('Shape', '', trgtShape)             
         
         cmds.select('scatterLocator', r = True)
         cmds.xform(a = True, t = (0,0,0))
         cmds.select(cl = True)
         
-        cmds.select(trgtObj,r = True )
+        cmds.select(trgtShape,r = True )
         cmds.select('scatterLocator', tgl = True)
-        cmds.select(srcObj, tgl = True)
-        
+        cmds.select(srcShape, tgl = True)
+    
+        print width
 
-        mel.eval("closestPointOnNurbsSurface -c " + str(count))     
+        mel.eval("objectScatter -c " + str(count) + " -n " + str(trgtName) + " -r " + str(radius) + " -w " + str(width) + " -h " + str(height) + " -d " + str(depth))     
         
 #-----------------------------------------------------------------------------------
-# ƒŠƒZƒbƒgƒƒ\ƒbƒh	
+# ãƒªã‚»ãƒƒãƒˆãƒ¡ã‚½ãƒƒãƒ‰	
 #-----------------------------------------------------------------------------------
         
     def resetPlacement(self, *args):
         self.selectScatterObjects()
+        cmds.select('scatterLocator', tgl = True)
         cmds.delete()        
         
     def selectScatterObjects(self, *args):        
